@@ -1,0 +1,1474 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Escola do Movimento</title>
+<meta name="theme-color" content="#1f6b4a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="alternate icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: app de uma coluna para telemóvel, cabeçalho com o tema do mês, navegação fixa em baixo */
+:root {
+  --bg: #f3f5f2; --surface: #ffffff; --fg: #17201b; --muted: #5d6a62; --line: #dbe2dc;
+  --accent: #1f6b4a; --accent-fg: #ffffff; --accent-soft: #e2efe7;
+  --saltar: #c98a10; --gatinhar: #138078; --empurrar: #c4513a; --puxar: #4f55b8;
+  --ok: #2f8a4f; --bad: #b8432f; --warn: #b07d10;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111613; --surface: #1a211d; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3631;
+  --accent: #5cc08d; --accent-fg: #0d1a13; --accent-soft: #1f3529;
+  --saltar: #e3a93a; --gatinhar: #3cb8ad; --empurrar: #e8775f; --puxar: #8d92ec;
+  --ok: #5cc08d; --bad: #ec7a64; --warn: #e3a93a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111613; --surface: #1a211d; --fg: #e6ece8; --muted: #9aa8a0; --line: #2c3631;
+  --accent: #5cc08d; --accent-fg: #0d1a13; --accent-soft: #1f3529;
+  --saltar: #e3a93a; --gatinhar: #3cb8ad; --empurrar: #e8775f; --puxar: #8d92ec;
+  --ok: #5cc08d; --bad: #ec7a64; --warn: #e3a93a; color-scheme: dark }
+
+* { box-sizing: border-box }
+:root { padding-top: env(safe-area-inset-top, 0px) }
+body { margin: 0 }
+[hidden] { display: none !important }
+.role { cursor: pointer; border: 0 }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.45 }
+button, input, select, textarea { font: inherit; color: inherit }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: .01em }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 110px }
+
+header.top { padding-block: 18px 14px; display: grid; gap: 10px }
+.brand { display: flex; justify-content: space-between; align-items: center; gap: 12px }
+.brand .logo { width: 40px; height: 40px; flex: none }
+.brand .name { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted) }
+.role { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; white-space: nowrap ; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.tema-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap }
+.tema-hero h1 { font-size: 44px; line-height: 1; text-transform: uppercase }
+.tema-hero .mes { color: var(--muted); font-size: 15px }
+.foco { color: var(--muted); margin: 0; max-width: 60ch }
+
+.banner { font-size: 14px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--fg); margin-bottom: 12px }
+
+section { display: grid; gap: 12px; margin-top: 22px }
+.sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.sec-h h2 { font-size: 22px; text-transform: uppercase }
+.sec-h .sub { color: var(--muted); font-size: 14px }
+
+.list { display: grid; gap: 8px }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; text-align: left; width: 100% }
+button.item { cursor: pointer }
+button.item:hover { border-color: var(--muted) }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0 }
+.row > * { min-width: 0 }
+.t { font-weight: 600 }
+.m { color: var(--muted); font-size: 14px }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block }
+.c-saltar { color: var(--saltar) } .c-gatinhar { color: var(--gatinhar) } .c-empurrar { color: var(--empurrar) } .c-puxar { color: var(--puxar) }
+.ok { color: var(--ok) } .bad { color: var(--bad) } .warn { color: var(--warn) }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 2px }
+.stat b { font-family: var(--display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums }
+.stat span { font-size: 11px; overflow-wrap: anywhere; color: var(--muted); text-transform: uppercase; letter-spacing: .05em }
+@media (max-width: 440px) { .stats { grid-template-columns: repeat(2, 1fr) } }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent) }
+.btn.ghost { background: transparent }
+.btn.danger { color: var(--bad) }
+.btn.big { width: 100%; font-size: 18px; min-height: 54px; font-family: var(--display); letter-spacing: .04em; text-transform: uppercase }
+.btn:focus-visible, .seg button:focus-visible, .item:focus-visible, nav.tabs button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+.btn:disabled { opacity: .5; cursor: default }
+
+.filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px }
+.filters button { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 14px; cursor: pointer }
+.filters button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); z-index: 5 }
+nav.tabs button { background: none; border: 0; padding: 8px 0 10px; min-width: 0; display: grid; justify-items: center; gap: 2px; font-size: 12px; color: var(--muted); cursor: pointer }
+nav.tabs button svg { width: 24px; height: 24px }
+nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600 }
+
+/* folha (formulário) */
+.sheet-bg { position: fixed; inset: 0; background: rgba(10, 16, 12, .45); z-index: 20; display: flex; align-items: flex-end; justify-content: center }
+.sheet { background: var(--bg); width: 100%; max-width: 640px; max-height: 92%; overflow-y: auto; border-radius: 18px 18px 0 0; padding-block: 16px calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 14px }
+.sheet h2 { font-size: 26px; text-transform: uppercase }
+.field { display: grid; gap: 6px }
+.field > label, .lbl { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+input[type=text], input[type=date], input[type=url], input[type=number], input[type=month], input[type=tel], input[type=email], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; min-height: 44px }
+textarea { min-height: 80px; resize: vertical }
+.seg { display: flex; flex-wrap: wrap; gap: 6px }
+.seg button { flex: 1 1 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-height: 44px; font-weight: 500 }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600 }
+.seg.bad-sel button[aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: #fff }
+.stepper { display: flex; align-items: center; gap: 10px }
+.stepper button { width: 52px; height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 26px; cursor: pointer }
+.stepper output { font-family: var(--display); font-size: 40px; min-width: 2.2ch; text-align: center; font-variant-numeric: tabular-nums }
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap }
+
+/* avaliação */
+.aval { display: grid; gap: 6px }
+.aval .who { display: flex; justify-content: space-between; gap: 8px }
+.aval .prev { font-size: 12px; color: var(--muted) }
+.scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
+.scale button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-height: 44px; font-family: var(--display); font-size: 20px; cursor: pointer }
+.scale button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+.legend { font-size: 13px; color: var(--muted) }
+
+table.tab { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums }
+table.tab th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line) }
+table.tab td { padding: 8px 6px; border-bottom: 1px solid var(--line) }
+table.tab td + td, table.tab th + th { text-align: right }
+@media print { nav.tabs, .btn, .seg, .banner, .toast, header .role { display: none !important } .wrap { padding-block: 0 } .item { break-inside: avoid } }
+.month-grid { display: grid; gap: 8px }
+.empty { color: var(--muted); padding: 16px; text-align: center; border: 1px dashed var(--line); border-radius: 12px }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; z-index: 30; font-size: 15px }
+a { color: var(--accent) }
+.video-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600 }
+.bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden }
+.bar i { display: block; height: 100% }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .2s ease-out } @keyframes up { from { transform: translateY(24px); opacity: .6 } } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="name"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1f6b4a"/><path d="M8 50 C 12 18, 52 18, 56 50" fill="none" stroke="#e3a93a" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 6"/><g stroke="#fff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M36 27 L31 37"/><path d="M31 36 L21 50 M31 36 L41 50"/><path d="M36 27 L25 13 M36 27 L50 17"/></g><circle cx="29.5" cy="43.5" r="4.6" fill="#fff"/><path d="M14 53 H50" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg>Escola do Movimento</span><button class="role" id="role" type="button">A carregar…</button></div>
+    <div class="tema-hero"><h1 id="heroTema">—</h1><span class="mes" id="heroMes"></span></div>
+    <p class="foco" id="heroFoco"></p>
+  </header>
+  <div id="banner"></div>
+  <main id="view"></main>
+</div>
+
+<nav class="tabs" aria-label="Secções">
+  <button data-tab="mes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Este mês</button>
+  <button data-tab="temas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>Planeamento</button>
+  <button data-tab="hoje" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hoje</button>
+  <button data-tab="sessoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>Sessões</button>
+  <button data-tab="exercicios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>Exercícios</button>
+  <button data-tab="avaliacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Avaliações</button>
+  <button data-tab="relatorio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7M9 8h3"/></svg>Relatórios</button>
+  <button data-tab="mais"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Mais</button>
+</nav>
+
+<script src="vendor/supabase-2.99.3.js"></script>
+<script src="config.js"></script>
+<script>
+const TEMAS = {
+  saltar: { nome: "Saltar" }, gatinhar: { nome: "Gatinhar" },
+  empurrar: { nome: "Empurrar" }, puxar: { nome: "Puxar" }
+};
+const TEMAS_AVALIADOS = ["gatinhar", "saltar"];
+const FERIAS = "Feriado ou férias";
+const MOTIVOS = ["Espaço ocupado", "Treino cancelado", "Jogo da equipa sénior", "Jogo ou torneio", "Poucos atletas", "Atraso do treino", "Feriado ou férias", "Falta de preparador", "Outro"];
+const CORREU = [{ v: 1, t: "Mal" }, { v: 2, t: "Razoável" }, { v: 3, t: "Bem" }, { v: 4, t: "Muito bem" }];
+const ESCALA = { 1: "Não realiza", 2: "Com dificuldade", 3: "Realiza", 4: "Domina" };
+const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const DIAS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+// Estado partilhado: coleções do db, chaveadas por id
+// Épocas desportivas (agosto a julho). Cada escalão pertence a uma época.
+const EPOCA_INICIAL = "2026/27";
+function epocaDe(iso) { const [y, m] = iso.split("-").map(Number); const a = m >= 8 ? y : y - 1; return a + "/" + String(a + 1).slice(2); }
+function anoEpoca(ep) { return +ep.slice(0, 4); }
+function epocaSeguinte(ep) { const a = anoEpoca(ep) + 1; return a + "/" + String(a + 1).slice(2); }
+const epocaEquipa = e => e.epoca || EPOCA_INICIAL;
+let epocaSel = null; // época que se está a ver (null = a atual)
+const epocaVista = () => epocaSel || epocaDe(hojeISO());
+function EQ(ep = epocaVista()) { return Object.fromEntries(Object.entries(S.equipas).filter(([, e]) => epocaEquipa(e) === ep)); }
+function epocasConhecidas() { return [...new Set([epocaDe(hojeISO()), ...Object.values(S.equipas).map(epocaEquipa)])].sort(); }
+const S = { equipas: {}, exercicios: {}, plano: {}, sessoes: {}, notas: {}, atletas: {}, avaliacoes: {}, pessoas: {}, alteracoes: {}, reunioes: {}, planos: {}, material: {}, planeadas: {}, semanas: {} };
+let subExe = "exercicios";
+let relPeriodo = "semana", relOffset = 0;
+let db = null, demo = false;
+let role = { nivel: "view", nome: "Consulta" }; // view | write | admin
+let tab = "hoje", filtroTema = "todos", filtroEquipa = "todas";
+let avalSel = { equipaId: null, tema: "gatinhar", mes: mesKey(new Date()) };
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function hojeISO() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function mesKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+function mesNome(k) { const [y, m] = k.split("-"); return MESES[+m - 1] + " " + y; }
+function dataCurta(iso) { const d = new Date(iso + "T12:00"); return DIAS[d.getDay()] + " " + d.getDate() + " " + MESES[d.getMonth()].slice(0, 3); }
+function sorted(obj, fn) { return Object.entries(obj).map(([id, v]) => ({ id, ...v })).sort(fn); }
+const FUNCOES = ["Coordenador", "Coordenador de modalidade", "Preparador físico", "Treinador", "Direção", "Outro"];
+function cargo(p) { return p.funcao + (p.modalidade ? " · " + p.modalidade : ""); }
+function modalidades() { return [...new Set(Object.values(EQ()).map(e => e.modalidade).filter(Boolean))].sort(); }
+// Horário tipo da equipa: uma linha por dia (dia, hora, local, duração)
+function horarioDe(e) {
+  if (Array.isArray(e.horario)) return e.horario;
+  return (e.dias || []).map(d => ({ dia: d, hora: e.hora || "", local: e.local || "", duracao: e.duracao || 20 }));
+}
+function horarioNoDia(e, iso) { const dow = new Date(iso + "T12:00").getDay(); return horarioDe(e).find(h => h.dia === dow) || horarioDe(e)[0] || { hora: e.hora || "", local: e.local || "", duracao: e.duracao || 20 }; }
+function pessoaNome(id) { return S.pessoas[id]?.nome || ""; }
+function preparadores() { return sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome)).filter(p => p.funcao === "Preparador físico" || p.funcao === "Coordenador"); }
+function equipaNome(id) { const e = S.equipas[id]; return e ? (e.modalidade + " " + (e.escalao || "")).trim() : "Equipa removida"; }
+function temaDoMes(k) { return S.plano[k]?.tema || null; }
+function chipTema(t) { return t ? `<span class="chip c-${t}"><span class="dot"></span>${TEMAS[t].nome}</span>` : ""; }
+// Três maneiras de usar: coordenação (tudo), preparador físico (regista) e consulta (pais, treinadores, direção)
+let vistaComo = null; // a coordenação pode pré-visualizar as outras maneiras
+const VISTAS = { admin: "Coordenação", write: "Preparador físico", view: "Pais, treinadores e direção" };
+const nivel = () => role.nivel === "admin" && vistaComo ? vistaComo : role.nivel;
+const podeEscrever = () => nivel() !== "view";
+const podeGerir = () => nivel() === "admin";
+const TABS = { admin: ["hoje", "sessoes", "exercicios", "avaliacoes", "relatorio", "mais"], write: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], view: ["mes", "temas", "exercicios", "avaliacoes"] };
+function escolherVista() {
+  const el = abrirFolha(`<h2>Ver a app como</h2><span class="m">Para confirmar o que cada pessoa vê. Nada muda nos dados.</span>
+    <div class="list">${Object.entries(VISTAS).map(([k, t]) => `<button class="item" data-vista="${k}"><div class="row"><span class="t">${t}</span>${nivel() === k ? `<span class="chip ok">atual</span>` : ""}</div></button>`).join("")}</div>
+    <div class="actions"><button class="btn" data-close>Fechar</button></div>`);
+  el.addEventListener("click", ev => { const b = ev.target.closest("[data-vista]"); if (!b) return; vistaComo = b.dataset.vista === "admin" ? null : b.dataset.vista; fecharFolha(); tab = TABS[nivel()][0]; render(); scrollTo(0, 0); });
+}
+
+function toast(msg) {
+  const el = document.createElement("div"); el.className = "toast"; el.textContent = msg; el.setAttribute("role", "status");
+  document.body.appendChild(el); setTimeout(() => el.remove(), 2200);
+}
+
+// ---------- gravação ----------
+let sb = null, sessao = null, renderTimer = null;
+function agendarRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => { if (!document.activeElement?.closest?.("#view textarea, #view input")) render(); else renderHeader(); }, 60);
+}
+function erroPT(error) { return error?.code === "42501" || /row-level security/i.test(error?.message || "") ? "sem permissão" : "verifique a ligação à internet"; }
+async function guardar(col, id, data) {
+  if (demo) { S[col][id] = data; render(); return; }
+  const { error } = await sb.from(col).upsert({ id, data });
+  if (error) { toast("Não foi possível guardar: " + erroPT(error)); throw error; }
+  S[col][id] = data; agendarRender();
+}
+async function apagar(col, id) {
+  if (demo) { delete S[col][id]; render(); return; }
+  const { error } = await sb.from(col).delete().eq("id", id);
+  if (error) return toast("Não foi possível apagar: " + erroPT(error));
+  delete S[col][id]; agendarRender();
+}
+const novoId = p => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// ---------- cabeçalho ----------
+function renderHeader() {
+  const k = mesKey(new Date()), p = S.plano[k];
+  const h = $("#heroTema");
+  h.textContent = p ? TEMAS[p.tema].nome : "Sem tema";
+  h.className = p ? "c-" + p.tema : "";
+  $("#heroMes").textContent = "tema de " + mesNome(k);
+  $("#heroFoco").textContent = p?.foco || (podeGerir() ? "Defina o tema do mês em Mais › Plano anual." : "");
+  $("#role").textContent = vistaComo ? "A ver como: " + { write: "PF", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
+  const avisoEp = epocaSel ? `<div class="banner">Está a ver a época <b>${epocaSel}</b>. <button class="btn" id="epAtual">Voltar à época atual</button></div>` : "";
+  $("#banner").innerHTML = avisoEp + (vistaComo ? `<div class="banner">Está a ver a app como <b>${VISTAS[vistaComo]}</b>. <button class="btn" id="sairVista">Voltar à coordenação</button></div>` : demo ? `<div class="banner">${window.EM_SIM_TEXTO || "Modo demonstração: a app ainda não está ligada à base de dados."}</div>` : !sessao ? `<div class="banner">Está a ver em modo de consulta. Equipa técnica: toque em <b>Entrar</b>.</div>` : "");
+}
+
+// ---------- HORÁRIO: semanal fixo + alterações pontuais ----------
+function isoDe(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function somaDias(iso, n) { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() + n); return isoDe(d); }
+// Sessões previstas entre duas datas (inclusive), já com mudanças e cancelamentos aplicados
+function previstas(de, ate) {
+  const out = [];
+  for (let d = de; d <= ate; d = somaDias(d, 1)) {
+    const dow = new Date(d + "T12:00").getDay();
+    const ep = epocaDe(d);
+    Object.entries(S.equipas).forEach(([eid, e]) => {
+      if (e.ativa === false || epocaEquipa(e) !== ep) return; // ainda não arrancou ou é de outra época
+      const h = horarioDe(e).find(x => x.dia === dow);
+      if (!h) return;
+      const alt = S.alteracoes[eid + "_" + d];
+      if (alt?.novaData) return; // passou para outro dia
+      out.push({ equipaId: eid, data: d, hora: alt?.novaHora || h.hora || "", local: alt?.novoLocal || h.local || "", duracao: alt?.novaDuracao || h.duracao || 20, mudouHora: !!alt?.novaHora, mudouLocal: !!alt?.novoLocal, cancelada: !!alt?.cancelada, motivo: alt?.motivo || "", altId: alt ? eid + "_" + d : null, original: d });
+    });
+  }
+  Object.entries(S.alteracoes).forEach(([id, a]) => {
+    if (a.novaData && a.novaData >= de && a.novaData <= ate && S.equipas[a.equipaId])
+      out.push({ equipaId: a.equipaId, data: a.novaData, hora: a.novaHora || horarioNoDia(S.equipas[a.equipaId], a.data).hora || "", local: a.novoLocal || horarioNoDia(S.equipas[a.equipaId], a.data).local || "", duracao: a.novaDuracao || horarioNoDia(S.equipas[a.equipaId], a.data).duracao || 20, motivo: a.motivo || "", mudouLocal: !!a.novoLocal, cancelada: false, mudada: a.data, altId: id, original: a.data });
+  });
+  return out.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
+}
+function sessaoDe(p) { return Object.entries(S.sessoes).map(([id, v]) => ({ id, ...v })).find(s => s.equipaId === p.equipaId && s.data === p.data); }
+function itemPrevista(p) {
+  const e = S.equipas[p.equipaId], s = sessaoDe(p);
+  const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Dada · ${s.nAtletas}</span>` : `<span class="chip bad">Não dada</span>`)
+    : p.cancelada ? `<span class="chip bad">Cancelada</span>` : p.data <= hojeISO() ? `<span class="chip warn">Por registar</span>` : "";
+  const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(p.motivo) + ")" : ""}` : p.cancelada ? ` · ${esc(p.motivo)}` : "";
+  return `<div class="item">
+    <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
+    <span class="m">${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(e.responsavel) ? " · " + esc(pessoaNome(e.responsavel)) : ""}${extra}</span>
+    ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
+      ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
+      ${s ? "" : `<button class="btn ghost" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">Alterar</button>`}
+      ${p.cancelada ? "" : planoDaSessao(p.equipaId, p.data) ? `<button class="btn" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Ver plano</button>` : podeGerir() ? `<button class="btn ghost" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Escolher plano</button>` : `<span class="m">Sem plano</span>`}</div>`
+      : s ? `<button class="btn ghost" data-act="verSessao" data-id="${s.id}" style="justify-self:start">Ver sessão</button>` : ""}
+  </div>`;
+}
+function formAlteracao(equipaId, data) {
+  const id = equipaId + "_" + data, a = S.alteracoes[id] || {}, eq = S.equipas[equipaId], hd = horarioNoDia(eq, data);
+  const e = { ...eq, hora: hd.hora, local: hd.local, duracao: hd.duracao };
+  let modo = a.cancelada ? "cancelar" : "mudar", motivo = a.motivo || "";
+  const el = abrirFolha(`<h2>Alterar sessão</h2>
+    <span class="m">${esc(e.modalidade)} ${esc(e.escalao)} · prevista para ${dataCurta(data)} às ${esc(e.hora || "")}</span>
+    <div class="seg" id="aModo"><button data-v="mudar">Mudar dia, hora ou local</button><button data-v="cancelar">Não vai haver</button></div>
+    <div id="aMudar" class="row"><div class="field" style="flex:1"><label for="aData">Novo dia</label><input type="date" id="aData" value="${a.novaData || data}"></div>
+      <div class="field" style="flex:1"><label for="aHora">Nova hora</label><input type="text" id="aHora" value="${esc(a.novaHora || e.hora || "")}"></div></div>
+    <div id="aMudar2" class="row"><div class="field" style="flex:2"><label for="aLocal">Local</label><input type="text" id="aLocal" value="${esc(a.novoLocal || e.local || "")}"></div>
+      <div class="field" style="flex:1"><label for="aDur">Duração (min)</label><input type="number" id="aDur" value="${a.novaDuracao || e.duracao || 20}"></div></div>
+    <div id="aCanc" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="aMot">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
+    <span class="m">Só muda esta semana. O horário habitual muda-se em Mais › Equipas.</span>
+    <div class="actions">${S.alteracoes[id] ? `<button class="btn danger" id="aRepor">Repor horário normal</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="aOk">Guardar</button></div>`);
+  const sync = () => {
+    $("#aModo", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === modo)));
+    $("#aMot", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === motivo)));
+    $("#aMudar", el).hidden = $("#aMudar2", el).hidden = modo !== "mudar";
+  };
+  $("#aModo", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { modo = b.dataset.v; sync(); } });
+  $("#aMot", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { motivo = b.dataset.v; sync(); } });
+  sync();
+  $("#aOk", el).addEventListener("click", async () => {
+    let dados = { equipaId, data };
+    if (modo === "cancelar") dados = { ...dados, cancelada: true, motivo: motivo || "Outro" };
+    else {
+      const nd = $("#aData", el).value || data, nh = $("#aHora", el).value.trim();
+      if (nd !== data) dados.novaData = nd;
+      if (nh && nh !== e.hora) dados.novaHora = nh;
+      const nl = $("#aLocal", el).value.trim(), ndur = +$("#aDur", el).value;
+      if (nl && nl !== e.local) dados.novoLocal = nl;
+      if (ndur && ndur !== (e.duracao || 20)) dados.novaDuracao = ndur;
+      if (motivo) dados.motivo = motivo;
+      if (!dados.novaData && !dados.novaHora && !dados.novoLocal && !dados.novaDuracao) { if (S.alteracoes[id]) await apagar("alteracoes", id); fecharFolha(); return; }
+    }
+    try { await guardar("alteracoes", id, dados); fecharFolha(); toast("Alteração guardada"); } catch (err) {}
+  });
+  $("#aRepor", el)?.addEventListener("click", () => { apagar("alteracoes", id); fecharFolha(); toast("Horário normal reposto"); });
+}
+
+function inicioEpoca() { const c = S.plano.config || {}; return c.inicios?.[epocaVista()] || (epocaVista() === EPOCA_INICIAL ? c.inicioEpoca : null) || null; }
+// Sessões do horário que já passaram e ainda não têm registo
+function emAtraso() {
+  const ini = inicioEpoca(), ontem = somaDias(hojeISO(), -1);
+  if (!ini || ini > ontem) return [];
+  return previstas(ini, ontem).filter(p => !p.cancelada && !sessaoDe(p));
+}
+function abrirAtraso() {
+  const lista = emAtraso();
+  let html = `<h2>Sessões em atraso</h2>`;
+  if (!inicioEpoca()) html += podeGerir()
+    ? `<span class="m">Indique quando começou a época para a app saber que sessões já deviam ter acontecido.</span><div class="field"><label for="iniEp">Início da época</label><input type="date" id="iniEp" value="${anoEpoca(epocaVista())}-09-15"></div><button class="btn primary" id="iniOk">Guardar</button>`
+    : `<span class="m">O coordenador ainda não indicou a data de início da época.</span>`;
+  else if (!lista.length) html += `<div class="empty">Está tudo registado desde ${dataCurta(inicioEpoca())}.</div>`;
+  else {
+    html += `<span class="m">${lista.length} sessão(ões) do horário desde ${dataCurta(inicioEpoca())} sem registo. Toque numa para registar como dada ou não dada. Sessões fora do horário registam-se em Registar sessão.</span><div class="list">`;
+    let sem = "";
+    lista.slice().reverse().forEach(p => {
+      const d = new Date(p.data + "T12:00"), seg = somaDias(p.data, -((d.getDay() + 6) % 7));
+      if (seg !== sem) { sem = seg; html += `<div class="lbl" style="margin-top:6px">Semana de ${dataCurta(seg)}</div>`; }
+      html += `<button class="item" data-atraso="${p.equipaId}|${p.data}"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><span class="m">${esc(p.hora)} · ${esc(p.local)}</span></button>`;
+    });
+    html += `</div>`;
+  }
+  html += `<div class="actions"><button class="btn" data-close>Fechar</button></div>`;
+  const el = abrirFolha(html);
+  $("#iniOk", el)?.addEventListener("click", async () => {
+    try { await guardar("plano", "config", { ...(S.plano.config || {}), inicios: { ...(S.plano.config?.inicios || {}), [epocaVista()]: $("#iniEp", el).value } }); abrirAtraso(); } catch (e) {}
+  });
+  el.addEventListener("click", ev => {
+    const b = ev.target.closest("[data-atraso]"); if (!b) return;
+    const [eid, data] = b.dataset.atraso.split("|");
+    const pv = previstas(data, data).find(x => x.equipaId === eid) || {};
+    formSessao({ equipaId: eid, data, hora: pv.hora, local: pv.local, duracao: pv.duracao, depois: abrirAtraso });
+  });
+}
+
+// ---------- RELATÓRIO ----------
+function inicioEpocaOuSetembro() {
+  if (inicioEpoca()) return inicioEpoca();
+  return anoEpoca(epocaVista()) + "-09-01";
+}
+function periodoRel() {
+  const hoje = new Date();
+  if (relPeriodo === "epoca") { const de = inicioEpocaOuSetembro(), fim = (anoEpoca(epocaVista()) + 1) + "-07-31", ate = fim < hojeISO() ? fim : hojeISO(); return { de, ate, nome: `Época ${epocaVista()}: ${dataCurta(de)} a ${dataCurta(ate)}` }; }
+  if (relPeriodo === "mes") {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + relOffset, 1);
+    const fim = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { de: isoDe(d), ate: isoDe(fim), nome: mesNome(mesKey(d)) };
+  }
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7) + relOffset * 7);
+  const dom = new Date(seg); dom.setDate(seg.getDate() + 6);
+  return { de: isoDe(seg), ate: isoDe(dom), nome: `${seg.getDate()} ${MESES[seg.getMonth()].slice(0, 3)} a ${dom.getDate()} ${MESES[dom.getMonth()].slice(0, 3)}` };
+}
+function calcRelatorio() {
+  const P = periodoRel(), limite = P.ate < hojeISO() ? P.ate : hojeISO();
+  // só conta sessões previstas a partir do primeiro registo feito na app
+  const inicio = inicioEpoca() || Object.values(S.sessoes).reduce((m, s) => s.data < m ? s.data : m, hojeISO());
+  const de = P.de > inicio ? P.de : inicio;
+  const prev = de <= limite ? previstas(de, limite) : [];
+  const regs = Object.entries(S.sessoes).map(([id, v]) => ({ id, ...v })).filter(s => s.data >= P.de && s.data <= P.ate);
+  const linhas = []; // uma linha por sessão (prevista ou registada fora do horário)
+  const usados = new Set();
+  prev.forEach(p => {
+    const s = regs.find(r => r.equipaId === p.equipaId && r.data === p.data);
+    if (s) { usados.add(s.id); linhas.push({ ...p, estado: s.estado, motivo: s.motivo, nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor }); }
+    else if (p.cancelada) linhas.push({ ...p, estado: "nao_dada", motivo: p.motivo });
+    else linhas.push({ ...p, estado: "por_registar" });
+  });
+  regs.filter(s => !usados.has(s.id)).forEach(s => linhas.push({ equipaId: s.equipaId, data: s.data, estado: s.estado, motivo: s.motivo, nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor, extra: true }));
+  linhas.forEach(l => { if (l.estado === "nao_dada" && l.motivo === FERIAS) l.estado = "ferias"; });
+  const dadas = linhas.filter(l => l.estado === "dada"), nao = linhas.filter(l => l.estado === "nao_dada"), porReg = linhas.filter(l => l.estado === "por_registar"), ferias = linhas.filter(l => l.estado === "ferias");
+  const atletas = dadas.reduce((a, l) => a + l.nAtletas, 0);
+  const porMod = {};
+  linhas.filter(l => l.estado !== "ferias").forEach(l => {
+    const e = S.equipas[l.equipaId]; const k = e ? e.modalidade + " " + e.escalao : "Equipa removida";
+    const m = porMod[k] = porMod[k] || { dadas: 0, nao: 0, porReg: 0, atletas: 0 };
+    if (l.estado === "dada") { m.dadas++; m.atletas += l.nAtletas; } else if (l.estado === "nao_dada") m.nao++; else m.porReg++;
+  });
+  const porPessoa = {}; dadas.forEach(l => { const n = pessoaNome(l.dadaPor) || "Não indicado"; porPessoa[n] = (porPessoa[n] || 0) + 1; });
+  const motivos = {}; nao.forEach(l => { const m = l.motivo || "Outro"; motivos[m] = (motivos[m] || 0) + 1; });
+  const temas = {}; regs.filter(r => r.estado === "dada").forEach(r => { const t = TEMAS[r.tema]?.nome || "Sem tema"; temas[t] = (temas[t] || 0) + 1; });
+  const ativas = Object.values(EQ()).filter(e => e.ativa !== false);
+  const modalidadesAbr = [...new Set(ativas.map(e => e.modalidade))].sort();
+  const escaloes = ativas.length;
+  const deReun = relPeriodo === "epoca" ? anoEpoca(epocaVista()) + "-08-01" : P.de;
+  const reun = Object.values(S.reunioes).filter(r => r.data >= deReun && r.data <= P.ate).sort((a, b) => a.data.localeCompare(b.data));
+  const tarefas = reun.flatMap(r => r.tarefas || []);
+  const aval = {}; Object.values(S.avaliacoes).filter(a => a.mes >= P.de.slice(0, 7) && a.mes <= P.ate.slice(0, 7)).forEach(a => {
+    const v = Object.values(a.resultados || {}).filter(Boolean); if (!v.length) return;
+    const t = TEMAS[a.tema]?.nome || a.tema; const x = aval[t] = aval[t] || { soma: 0, n: 0 }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
+  return { P, linhas, dadas, nao, porReg, ferias, atletas, porMod, porPessoa, motivos, temas, modalidadesAbr, escaloes, reun, tarefas, aval };
+}
+function barras(obj, cor, total) {
+  return Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+    `<div class="row"><span class="m">${esc(k)}</span><span class="t">${n}</span></div><div class="bar"><i style="width:${n / (total || 1) * 100}%;background:${cor}"></i></div>`).join("");
+}
+function viewRelatorio() {
+  const R = calcRelatorio(), fechadas = R.dadas.length + R.nao.length;
+  const pct = fechadas ? Math.round(R.dadas.length / fechadas * 100) : 0;
+  let html = `<section><div class="sec-h"><h2>Relatório</h2></div>
+    <div class="seg" id="relP"><button data-v="semana" aria-pressed="${relPeriodo === "semana"}">Semanal</button><button data-v="mes" aria-pressed="${relPeriodo === "mes"}">Mensal</button><button data-v="epoca" aria-pressed="${relPeriodo === "epoca"}">Toda a época</button></div>
+    ${relPeriodo === "epoca" ? `<div class="row"><span class="t">${R.P.nome}</span></div>` : `<div class="row"><button class="btn" data-rel="-1" aria-label="Período anterior">‹</button><span class="t">${R.P.nome}</span><button class="btn" data-rel="1" aria-label="Período seguinte" ${relOffset >= 0 ? "disabled" : ""}>›</button></div>`}
+    <div class="stats">
+      <div class="stat"><b class="ok">${R.dadas.length}</b><span>Dadas</span></div>
+      <div class="stat"><b class="bad">${R.nao.length}</b><span>Não dadas</span></div>
+      <div class="stat"><b>${pct}%</b><span>Cumprimento</span></div>
+      <div class="stat"><b>${R.atletas}</b><span>Presenças</span></div>
+    </div>
+    ${R.ferias.length ? `<span class="m">${R.ferias.length} sessão(ões) sem efeito por férias ou feriados (não contam como não dadas).</span>` : ""}
+    ${R.porReg.length ? `<div class="banner">${R.porReg.length} sessão(ões) prevista(s) ainda sem registo.</div>` : ""}
+  </section>`;
+  html += `<section><div class="sec-h"><h2>Onde está implementada</h2></div><div class="item"><span class="t">${R.modalidadesAbr.length} modalidades · ${R.escaloes} escalões</span><span class="m">${R.modalidadesAbr.map(esc).join(", ")}</span></div></section>`;
+  if (Object.keys(R.temas).length) html += `<section><div class="sec-h"><h2>Temas trabalhados</h2><span class="sub">sessões dadas</span></div><div class="item">${barras(R.temas, "var(--accent)", R.dadas.length)}</div></section>`;
+  if (Object.keys(R.aval).length) html += `<section><div class="sec-h"><h2>Avaliações</h2><span class="sub">média de 1 a 4</span></div><div class="item">${Object.entries(R.aval).map(([t, x]) => `<div class="row"><span class="m">${esc(t)} (${x.n} avaliações)</span><span class="t">${(x.soma / x.n).toFixed(1)}</span></div>`).join("")}</div></section>`;
+  html += `<section><div class="sec-h"><h2>Por modalidade</h2></div><div class="item" style="overflow-x:auto"><table class="tab"><thead><tr><th>Modalidade</th><th>Dadas</th><th>Não</th><th>Média atl.</th></tr></thead><tbody>`;
+  Object.entries(R.porMod).sort().forEach(([k, m]) => html += `<tr><td>${esc(k)}</td><td class="ok">${m.dadas}</td><td class="bad">${m.nao}</td><td>${m.dadas ? Math.round(m.atletas / m.dadas) : "–"}</td></tr>`);
+  if (!Object.keys(R.porMod).length) html += `<tr><td colspan="4" class="m">Sem sessões neste período.</td></tr>`;
+  html += `</tbody></table></div></section>`;
+  if (podeEscrever() && R.dadas.length) html += `<section><div class="sec-h"><h2>Quem deu as sessões</h2></div><div class="item">${barras(R.porPessoa, "var(--accent)", R.dadas.length)}</div></section>`;
+  if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div></section>`;
+  if (R.porReg.length && podeEscrever()) html += `<section><div class="sec-h"><h2>Por registar</h2></div><div class="list">${R.porReg.map(p => `<div class="item"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}" style="justify-self:start">Registar</button></div>`).join("")}</div></section>`;
+  if (podeGerir()) {
+    const feitas = R.tarefas.filter(t => t.feito).length;
+    html += `<section><div class="sec-h"><h2>Reuniões</h2><span class="sub">${R.reun.length} no período</span></div><div class="list">`;
+    if (R.tarefas.length) html += `<div class="item"><div class="row"><span class="m">Tarefas concluídas</span><span class="t">${feitas} de ${R.tarefas.length}</span></div><div class="bar"><i style="width:${feitas / R.tarefas.length * 100}%;background:var(--ok)"></i></div></div>`;
+    R.reun.forEach(r => html += `<div class="item"><div class="row"><span class="t">${dataCurta(r.data)} · ${r.tipo === "online" ? "Online" : "Presencial"}</span><span class="m">${(r.tarefas || []).filter(t => !t.feito).length} tarefas abertas</span></div>${r.objetivos ? `<span class="m">${esc(r.objetivos)}</span>` : ""}</div>`);
+    if (!R.reun.length) html += `<div class="empty">Sem reuniões registadas neste período.</div>`;
+    html += `</div></section>`;
+  }
+  html += `<section><button class="btn big" id="relCopiar">Copiar relatório em texto</button>${window.top === window ? `<button class="btn" id="relImprimir">Imprimir ou guardar em PDF</button>` : ""}<span class="m">Para enviar à direção por email ou WhatsApp.</span></section>`;
+  return html;
+}
+function textoRelatorio() {
+  const R = calcRelatorio(), L = [];
+  L.push(`Escola do Movimento · Relatório ${relPeriodo === "mes" ? "mensal" : relPeriodo === "epoca" ? "da época" : "semanal"} (${R.P.nome})`, "");
+  L.push(`Implementada em ${R.modalidadesAbr.length} modalidades e ${R.escaloes} escalões: ${R.modalidadesAbr.join(", ")}`, "");
+  L.push(`Sessões dadas: ${R.dadas.length}`, `Sessões não dadas: ${R.nao.length}`, `Presenças de atletas: ${R.atletas}`);
+  if (R.ferias.length) L.push(`Sem efeito por férias ou feriados: ${R.ferias.length}`);
+  if (R.porReg.length) L.push(`Ainda por registar: ${R.porReg.length}`);
+  L.push("", "Por modalidade:");
+  Object.entries(R.porMod).sort().forEach(([k, m]) => L.push(`• ${k}: ${m.dadas} dadas, ${m.nao} não dadas${m.dadas ? `, média ${Math.round(m.atletas / m.dadas)} atletas` : ""}`));
+  if (podeEscrever() && R.dadas.length) { L.push("", "Quem deu:"); Object.entries(R.porPessoa).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  if (Object.keys(R.temas).length) { L.push("", "Temas trabalhados (sessões dadas):"); Object.entries(R.temas).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  if (Object.keys(R.aval).length) { L.push("", "Avaliações (média de 1 a 4):"); Object.entries(R.aval).forEach(([t, x]) => L.push(`• ${t}: ${(x.soma / x.n).toFixed(1)} (${x.n} avaliações)`)); }
+  if (podeGerir() && R.reun.length) {
+    L.push("", `Reuniões: ${R.reun.length}` + (R.tarefas.length ? ` · tarefas concluídas ${R.tarefas.filter(t => t.feito).length} de ${R.tarefas.length}` : ""));
+    R.reun.forEach(r => L.push(`• ${dataCurta(r.data)} (${r.tipo === "online" ? "online" : "presencial"})${r.objetivos ? ": " + r.objetivos.replace(/\s+/g, " ") : ""}`));
+  }
+  if (R.nao.length) { L.push("", "Motivos das não dadas:"); Object.entries(R.motivos).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  return L.join("\n");
+}
+
+// ---------- HOJE ----------
+function viewHoje() {
+  const hoje = hojeISO(), dow = new Date().getDay(), k = mesKey(new Date());
+  const equipas = sorted(EQ(), (a, b) => (a.hora || "").localeCompare(b.hora || ""));
+  const deHoje = equipas.filter(e => (e.dias || []).includes(dow));
+  const sessHoje = Object.values(S.sessoes).filter(s => s.data === hoje);
+  const doMes = Object.values(S.sessoes).filter(s => s.data.startsWith(k));
+  const dadas = doMes.filter(s => s.estado === "dada"), nao = doMes.filter(s => s.estado === "nao_dada");
+  const media = dadas.length ? Math.round(dadas.reduce((a, s) => a + (+s.nAtletas || 0), 0) / dadas.length) : 0;
+  const pct = doMes.length ? Math.round(dadas.length / doMes.length * 100) : 0;
+  const motivos = {}; nao.forEach(s => motivos[s.motivo || "Outro"] = (motivos[s.motivo || "Outro"] || 0) + 1);
+
+  const prevHoje = previstas(hoje, hoje), prox = previstas(somaDias(hoje, 1), somaDias(hoje, 7));
+  let html = `<section><div class="sec-h"><h2>Hoje</h2><span class="sub">${dataCurta(hoje)}</span></div><div class="list">`;
+  if (!prevHoje.length) html += `<div class="empty">Não há sessões previstas para hoje.</div>`;
+  prevHoje.forEach(p => html += itemPrevista(p));
+  html += `</div>`;
+  if (podeEscrever()) html += `<button class="btn primary big" data-act="registar">Registar outra sessão</button>`;
+  html += `</section><section><div class="sec-h"><h2>Próximos 7 dias</h2></div><div class="list">`;
+  let dia = "";
+  prox.forEach(p => { if (p.data !== dia) { dia = p.data; html += `<div class="lbl" style="margin-top:6px">${dataCurta(p.data)}</div>`; } html += itemPrevista(p); });
+  if (!prox.length) html += `<div class="empty">Sem sessões previstas.</div>`;
+  html += `</div></section>`;
+
+  if (podeGerir()) { const ab = tarefasAbertas(); if (ab.length) html += `<section><div class="sec-h"><h2>Tarefas por fazer</h2><span class="sub">${ab.length}</span></div><div class="list">${ab.slice(0, 5).map(itemTarefa).join("")}</div></section>`; }
+
+  if (!podeGerir()) return html;
+  html += `<section><div class="sec-h"><h2>Resumo de ${MESES[new Date().getMonth()]}</h2></div>
+    <div class="stats">
+      <div class="stat"><b class="ok">${dadas.length}</b><span>Dadas</span></div>
+      <div class="stat"><b class="bad">${nao.length}</b><span>Não dadas</span></div>
+      <div class="stat"><b>${pct}%</b><span>Cumprimento</span></div>
+      <div class="stat"><b>${media}</b><span>Atletas/sessão</span></div>
+    </div>`;
+  if (nao.length) {
+    html += `<div class="item"><span class="lbl">Motivos de sessões não dadas</span>`;
+    Object.entries(motivos).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => {
+      html += `<div class="row"><span class="m">${esc(m)}</span><span class="t">${n}</span></div><div class="bar"><i style="width:${n / nao.length * 100}%;background:var(--bad)"></i></div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</section>`;
+  return html;
+}
+
+// ---------- CONSULTA (pais, treinadores, direção) ----------
+function viewMes() {
+  const h = new Date(), hoje = hojeISO(), fim = isoDe(new Date(h.getFullYear(), h.getMonth() + 1, 0));
+  const lista = previstas(hoje, fim);
+  let html = `<section><div class="sec-h"><h2>Sessões deste mês</h2><span class="sub">até ${dataCurta(fim)}</span></div><div class="list">`;
+  let dia = "";
+  lista.forEach(p => {
+    if (p.data !== dia) { if (dia) html += `</div>`; dia = p.data; html += `<div class="item"><span class="lbl" style="${p.data === hoje ? "color:var(--accent)" : ""}">${dataCurta(p.data)}${p.data === hoje ? " · hoje" : ""}</span>`; }
+    html += `<div class="row"><span class="t" style="${p.cancelada ? "text-decoration:line-through" : ""}">${esc(equipaNome(p.equipaId))}</span><span class="m">${p.cancelada ? "sem sessão" : esc(p.hora) + " · " + esc(p.local)}</span></div>`;
+  });
+  if (dia) html += `</div>`;
+  if (!lista.length) html += `<div class="empty">Não há mais sessões previstas este mês.</div>`;
+  return html + `</div></section>`;
+}
+function viewTemas() {
+  const k0 = mesKey(new Date()), inicio = anoEpoca(epocaVista());
+  const dadasPorMes = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada") { const mk = s.data.slice(0, 7); dadasPorMes[mk] = (dadasPorMes[mk] || 0) + 1; } });
+  const abordados = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada" && TEMAS[s.tema]) abordados[TEMAS[s.tema].nome] = (abordados[TEMAS[s.tema].nome] || 0) + 1; });
+  const total = Object.values(abordados).reduce((a, b) => a + b, 0);
+  let html = "";
+  if (total) html += `<section><div class="sec-h"><h2>Temas já abordados</h2><span class="sub">${total} sessões dadas</span></div><div class="item">${barras(abordados, "var(--accent)", total)}</div></section>`;
+  html += `<section><div class="sec-h"><h2>Planeamento da época</h2><span class="sub">${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="list">`;
+  for (let i = 0; i < 10; i++) {
+    const k = mesKey(new Date(inicio, 8 + i, 1)), p = S.plano[k], estado = k < k0 ? "Abordado" : k === k0 ? "Em curso" : "Previsto";
+    html += `<div class="item" style="${k === k0 ? "border-color:var(--accent)" : ""}"><div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(p.tema) : `<span class="m">Por definir</span>`}</div>
+      <span class="m">${estado}${dadasPorMes[k] ? " · " + dadasPorMes[k] + " sessões dadas" : ""}${p?.foco ? " · " + esc(p.foco) : ""}</span></div>`;
+  }
+  return html + `</div></section>`;
+}
+
+// ---------- SESSÕES ----------
+function viewSessoes() {
+  const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade));
+  let lista = sorted(S.sessoes, (a, b) => b.data.localeCompare(a.data) || (b.criadoEm || 0) - (a.criadoEm || 0)).filter(x => epocaDe(x.data) === epocaVista());
+  if (filtroEquipa !== "todas") lista = lista.filter(s => s.equipaId === filtroEquipa);
+  let html = `<section><div class="sec-h"><h2>Sessões</h2><span class="sub">${lista.length} registos</span></div>`;
+  if (podeEscrever()) {
+    const n = emAtraso().length;
+    html += `<button class="btn primary big" data-act="registar">Registar sessão</button>
+      <button class="btn" data-act="atraso">${inicioEpoca() ? (n ? `Registar sessões passadas (${n} em atraso)` : "Sessões passadas: tudo registado") : "Registar sessões passadas"}</button>`;
+  }
+  html += `<div class="filters" role="group" aria-label="Filtrar por equipa"><button data-feq="todas" aria-pressed="${filtroEquipa === "todas"}">Todas</button>`;
+  equipas.forEach(e => html += `<button data-feq="${e.id}" aria-pressed="${filtroEquipa === e.id}">${esc(e.modalidade)} ${esc(e.escalao)}</button>`);
+  html += `</div><div class="list">`;
+  if (!lista.length) html += `<div class="empty">Ainda não há sessões registadas. ${podeEscrever() ? "Toque em Registar sessão no fim de cada sessão." : ""}</div>`;
+  let mesAtual = "";
+  lista.forEach(s => {
+    const mk = s.data.slice(0, 7);
+    if (mk !== mesAtual) { mesAtual = mk; html += `<div class="lbl" style="margin-top:8px">${mesNome(mk)}</div>`; }
+    html += itemSessao(s);
+  });
+  html += `</div></section>`;
+  return html;
+}
+function itemSessao(s) {
+  const estado = s.estado === "dada"
+    ? `<span class="chip ok">${s.nAtletas} atletas</span>`
+    : `<span class="chip bad">Não dada</span>`;
+  const linha = s.estado === "dada" ? (CORREU.find(c => c.v === s.correu)?.t || "") + (s.resumo ? " · " + esc(s.resumo) : "") : esc(s.motivo || "");
+  return `<button class="item" data-act="verSessao" data-id="${s.id}">
+    <div class="row"><span class="t">${esc(equipaNome(s.equipaId))}</span>${estado}</div>
+    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${pessoaNome(s.dadaPor) ? " · " + esc(pessoaNome(s.dadaPor)) : ""}${s.exemplo ? " · exemplo" : ""}</span>${chipTema(s.tema)}</div>
+    ${linha ? `<span class="m">${linha}</span>` : ""}</button>`;
+}
+
+function formSessao(s) {
+  const novo = !s || !s.id;
+  const hoje = hojeISO(), dow = new Date().getDay();
+  const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade));
+  const sugerida = s?.equipaId || equipas.find(e => horarioDe(e).some(h => h.dia === dow) && !Object.values(S.sessoes).some(x => x.data === hoje && x.equipaId === e.id))?.id || equipas[0]?.id;
+  const eqS = S.equipas[s?.equipaId || sugerida] || {};
+  if (s) ["hora", "local", "duracao"].forEach(k => { if (s[k] == null || s[k] === "") delete s[k]; });
+  const hS = eqS.modalidade ? horarioNoDia(eqS, s?.data || hoje) : {};
+  const f = Object.assign({ hora: hS.hora || "", local: hS.local || "", duracao: hS.duracao || 20 }, { data: hoje, equipaId: sugerida, estado: "dada", nAtletas: 10, correu: 3, motivo: "", resumo: "", tema: temaDoMes(mesKey(new Date())) || "saltar", exercicios: [], itens: [] }, s || {});
+  if (!f.itens?.length && f.exercicios?.length) f.itens = f.exercicios.map(x => ({ parte: "principal", exercicioId: x }));
+  const plS = !s?.id && planoDaSessao(f.equipaId, f.data);
+  if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (plS.tema) f.tema = plS.tema; }
+  let nota = s?.id ? (S.notas[s.id]?.texto || "") : "";
+
+  const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>
+    <div class="field"><label for="fEq">Equipa</label><select id="fEq">${equipas.map(e => `<option value="${e.id}" ${e.id === f.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
+    <div class="field"><label for="fPor">Preparador físico que dá a sessão</label><select id="fPor"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join("")}</select></div>
+    <div class="field"><label for="fData">Data</label><input type="date" id="fData" value="${f.data}"></div>
+    <div class="row"><div class="field" style="flex:1"><label for="fHora">Hora</label><input type="text" id="fHora" value="${esc(f.hora)}" placeholder="18:30"></div>
+      <div class="field" style="flex:1"><label for="fDur">Duração (min)</label><input type="number" id="fDur" value="${f.duracao}"></div></div>
+    <div class="field"><label for="fLocal">Local</label><input type="text" id="fLocal" value="${esc(f.local)}" list="locais"><datalist id="locais">${[...new Set(Object.values(S.equipas).map(x => x.local).concat(Object.values(S.sessoes).map(x => x.local)).filter(Boolean))].map(l => `<option>${esc(l)}</option>`).join("")}</datalist></div>
+    <div class="field"><span class="lbl">A sessão foi dada?</span><div class="seg" id="fEstado"><button data-v="dada">Sim, foi dada</button><button data-v="nao_dada">Não foi dada</button></div></div>
+    <div id="blocoDada" class="field" style="gap:14px">
+      <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><output id="fN">${f.nAtletas}</output><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
+      <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Tema</span><div class="seg" id="fTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
+        <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join("")}</select></div>
+      <div id="fItens">${editorItens(f.itens, f.tema)}</div>
+      <div class="field"><label for="fResumo">Resumo (visível para treinadores e pais)</label><input type="text" id="fResumo" value="${esc(f.resumo)}" placeholder="Ex.: Boa adesão, rever receção dos saltos"></div>
+    </div>
+    <div id="blocoNao" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="fMotivo">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
+    <div class="field"><label for="fNota">Nota interna (só equipa técnica)</label><textarea id="fNota" placeholder="Observações para a próxima sessão">${esc(nota)}</textarea></div>
+    <div class="actions">${!novo && podeEscrever() ? `<button class="btn danger" id="fDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fOk">Guardar</button></div>`);
+
+  const seg = (id, key, conv = v => v) => {
+    const box = $(id, el);
+    const sync = () => box.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(conv(b.dataset.v) === f[key])));
+    box.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; f[key] = conv(b.dataset.v); sync(); if (key === "estado") vis(); });
+    sync();
+  };
+  const vis = () => { $("#blocoDada", el).hidden = f.estado !== "dada"; $("#blocoNao", el).hidden = f.estado === "dada"; };
+  ligarEditorItens(el, () => f.tema);
+  $("#fPlano", el).addEventListener("change", ev => {
+    const pl = S.planos[ev.target.value]; if (!pl) return;
+    if (pl.tema) { f.tema = pl.tema; $("#fTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === f.tema))); }
+    $("#fItens", el).innerHTML = editorItens(pl.itens, f.tema); toast("Exercícios do plano carregados");
+  });
+  const fPor = $("#fPor", el);
+  fPor.value = s?.dadaPor ?? S.equipas[f.equipaId]?.responsavel ?? "";
+  $("#fEq", el).addEventListener("change", ev => {
+    const q = S.equipas[ev.target.value] || {};
+    if (!s?.dadaPor) fPor.value = q.responsavel || "";
+    if (!s?.id && q.modalidade) { const h = horarioNoDia(q, $("#fData", el).value || hoje); $("#fHora", el).value = h.hora || ""; $("#fLocal", el).value = h.local || ""; $("#fDur", el).value = h.duracao || 20; }
+  });
+  seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); seg("#fTema", "tema"); seg("#fMotivo", "motivo"); vis();
+  el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, f.nAtletas + +b.dataset.step); $("#fN", el).textContent = f.nAtletas; }));
+
+  $("#fOk", el).addEventListener("click", async () => {
+    const id = s?.id || novoId("s");
+    const dados = {
+      data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.tema,
+      nAtletas: f.estado === "dada" ? f.nAtletas : 0, correu: f.estado === "dada" ? f.correu : null,
+      itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
+      motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
+    };
+    if (s?.exemplo) dados.exemplo = true;
+    try {
+      await guardar("sessoes", id, dados);
+      const t = $("#fNota", el).value.trim();
+      if (t || nota) await guardar("notas", id, { texto: t });
+      fecharFolha(); toast("Sessão guardada"); if (s?.depois) s.depois();
+    } catch (e) {}
+  });
+  $("#fDel", el)?.addEventListener("click", e => {
+    const b = e.currentTarget;
+    if (b.dataset.armed) { apagar("sessoes", s.id); if (S.notas[s.id]) apagar("notas", s.id); fecharFolha(); toast("Sessão apagada"); }
+    else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; }
+  });
+}
+
+function verSessao(id) {
+  const s = { id, ...S.sessoes[id] };
+  if (podeEscrever()) return formSessao(s);
+  const exs = (s.exercicios || []).map(x => S.exercicios[x]?.nome).filter(Boolean);
+  abrirFolha(`<h2>${esc(equipaNome(s.equipaId))}</h2>
+    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " · " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${s.duracao ? " · " + s.duracao + " min" : ""}</span>${chipTema(s.tema)}</div>
+    ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
+      ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
+      ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
+      : `<div class="field"><span class="lbl">Não foi dada</span><span>${esc(s.motivo)}</span></div>`}
+    <div class="actions"><button class="btn" data-close>Fechar</button></div>`);
+}
+
+// ---------- EXERCÍCIOS ----------
+function itemExercicio(e) {
+  return `<button class="item" data-act="verExercicio" data-id="${e.id}">
+    <div class="row"><span class="t">${esc(e.nome)}</span>${chipTema(e.tema)}</div>
+    <span class="m">${esc((e.descricao || "").slice(0, 110))}${(e.descricao || "").length > 110 ? "…" : ""}</span>
+    <span class="m">${e.duracao ? e.duracao + " min" : ""}${e.video ? " · tem vídeo" : ""}</span></button>`;
+}
+function viewExercicios() {
+  if (!podeEscrever()) subExe = "exercicios";
+  const topo = podeEscrever() ? `<div class="seg" id="subExe" style="margin-top:18px">${[["exercicios", "Exercícios"], ["planos", "Planos de sessão"], ["material", "Material"]].map(([k, t]) => `<button data-sub="${k}" aria-pressed="${subExe === k}">${t}</button>`).join("")}</div>` : "";
+  if (subExe === "planos") return topo + viewPlanos();
+  if (subExe === "material") return topo + viewMaterial();
+  return topo + viewListaExercicios();
+}
+function viewListaExercicios() {
+  let lista = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome));
+  if (filtroTema !== "todos") lista = lista.filter(e => e.tema === filtroTema);
+  let html = `<section><div class="sec-h"><h2>Exercícios</h2><span class="sub">${lista.length}</span></div>`;
+  html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${TEMAS[t].nome}</button>`).join("")}</div>`;
+  if (podeGerir()) html += `<button class="btn" data-act="novoExercicio">Adicionar exercício</button>`;
+  html += `<div class="list">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">Sem exercícios neste tema.</div>`}</div></section>`;
+  return html;
+}
+function verExercicio(id) {
+  const e = { id, ...S.exercicios[id] };
+  const el = abrirFolha(`<h2>${esc(e.nome)}</h2>
+    <div class="row"><span class="m">${e.duracao ? e.duracao + " min" : ""}</span>${chipTema(e.tema)}</div>
+    ${e.video ? `<a class="video-link" href="${esc(e.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a>` : `<span class="m">Ainda sem vídeo.</span>`}
+    ${e.descricao ? `<div class="field"><span class="lbl">Como fazer</span><span style="white-space:pre-line">${esc(e.descricao)}</span></div>` : ""}
+    ${e.progressao ? `<div class="field"><span class="lbl">Progressão</span><span style="white-space:pre-line">${esc(e.progressao)}</span></div>` : ""}
+    <div class="actions">${podeGerir() ? `<button class="btn" id="eEdit">Editar</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
+  $("#eEdit", el)?.addEventListener("click", () => formExercicio(e));
+}
+function formExercicio(e) {
+  e = e || { tema: filtroTema !== "todos" ? filtroTema : (temaDoMes(mesKey(new Date())) || "saltar") };
+  const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
+    <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
+    <div class="field"><label for="xTema">Tema</label><select id="xTema">${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${TEMAS[t].nome}</option>`).join("")}</select></div>
+    <div class="field"><label for="xDur">Duração (min)</label><input type="number" id="xDur" min="1" max="30" value="${e.duracao || 5}"></div>
+    <div class="field"><label for="xVideo">Link do vídeo (YouTube, Instagram, Drive…)</label><input type="url" id="xVideo" value="${esc(e.video)}" placeholder="https://"></div>
+    <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
+    <div class="field"><label for="xProg">Progressão</label><textarea id="xProg">${esc(e.progressao)}</textarea></div>
+    <div class="actions">${e.id ? `<button class="btn danger" id="xDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="xOk">Guardar</button></div>`);
+  $("#xOk", el).addEventListener("click", async () => {
+    const nome = $("#xNome", el).value.trim(); if (!nome) return toast("Escreva o nome do exercício");
+    const v = $("#xVideo", el).value.trim();
+    try {
+      await guardar("exercicios", e.id || novoId("x"), { nome, tema: $("#xTema", el).value, duracao: +$("#xDur", el).value || null, video: /^https?:\/\//.test(v) ? v : "", descricao: $("#xDesc", el).value.trim(), progressao: $("#xProg", el).value.trim() });
+      fecharFolha(); toast("Exercício guardado");
+    } catch (err) {}
+  });
+  $("#xDel", el)?.addEventListener("click", ev => {
+    const b = ev.currentTarget;
+    if (b.dataset.armed) { apagar("exercicios", e.id); fecharFolha(); toast("Exercício apagado"); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; }
+  });
+}
+
+// ---------- PLANOS DE SESSÃO E MATERIAL ----------
+function segundaDe(iso) { const d = new Date(iso + "T12:00"); return somaDias(iso, -((d.getDay() + 6) % 7)); }
+// Plano de uma sessão: o escolhido para essa sessão ou, se não houver, o plano da semana
+function planoDaSessao(equipaId, data) {
+  const id = S.planeadas[equipaId + "_" + data]?.planoId || S.semanas[segundaDe(data)]?.planoId;
+  return id && S.planos[id] ? { id, ...S.planos[id] } : null;
+}
+const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]];
+const parteDe = i => i.parte === "aquecimento" ? "aquecimento" : "principal";
+function htmlPlano(pl) {
+  const itens = (pl.itens || []).filter(i => S.exercicios[i.exercicioId]);
+  const bloco = (k, nome) => { const l = itens.filter(i => parteDe(i) === k); return `<div class="field"><span class="lbl">${nome}</span><div class="list">${l.map((i, n) => { const x = S.exercicios[i.exercicioId]; return `<div class="item">
+      <div class="row"><span class="t">${n + 1}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
+      ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
+      ${i.obs ? `<span><b>Obs.:</b> ${esc(i.obs)}</span>` : ""}
+      ${x.video ? `<a class="video-link" href="${esc(x.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a>` : ""}</div>`; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+  return `${pl.tema ? chipTema(pl.tema) : ""}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
+    ${(pl.material || []).length ? `<div class="field"><span class="lbl">Material</span>${pl.material.filter(m => S.material[m.materialId]).map(m => `<span>• ${esc(S.material[m.materialId].nome)}${m.qtd ? " × " + esc(m.qtd) : ""}</span>`).join("")}</div>` : ""}
+    ${pl.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(pl.notas)}</span></div>` : ""}`;
+}
+function verPlanoSessao(eid, data) {
+  const pl = planoDaSessao(eid, data), propria = S.planeadas[eid + "_" + data]?.planoId;
+  const el = abrirFolha(`<h2>Plano da sessão</h2><span class="m">${esc(equipaNome(eid))} · ${dataCurta(data)}</span>
+    ${pl ? `<span class="t">${esc(pl.nome)}</span><span class="m">${propria ? "Escolhido para esta sessão" : "Plano da semana"}</span>${htmlPlano(pl)}` : `<div class="empty">Ainda não há plano para esta sessão.</div>`}
+    ${podeGerir() ? `<div class="field"><label for="psSel">Plano desta sessão</label><select id="psSel"><option value="">Usar o plano da semana</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === propria ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>` : ""}
+    <div class="actions">${podeGerir() && pl ? `<button class="btn" id="psEdit">Editar plano</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
+  $("#psSel", el)?.addEventListener("change", async ev => {
+    const id = eid + "_" + data;
+    if (ev.target.value) await guardar("planeadas", id, { planoId: ev.target.value, equipaId: eid, data }).catch(() => {});
+    else if (S.planeadas[id]) await apagar("planeadas", id);
+    verPlanoSessao(eid, data);
+  });
+  $("#psEdit", el)?.addEventListener("click", () => formPlano(pl.id));
+}
+function viewPlanos() {
+  const lista = sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome));
+  let html = `<section><div class="sec-h"><h2>Planos de sessão</h2><span class="sub">${lista.length}</span></div>
+    <span class="m">Cada plano é a prescrição da sessão: aquecimento e parte principal, com exercícios da base de dados, tempo ou repetições, observações e material. Escolhe-se um plano para a semana inteira (em Mais › Plano anual, ao preparar o mês) e, se for preciso, outro para uma sessão em particular.</span>`;
+  if (podeGerir()) {
+    html += `<button class="btn primary" data-act="novoPlano">Novo plano</button><div class="item"><span class="lbl">Plano de cada semana</span>`;
+    const seg0 = segundaDe(hojeISO());
+    for (let i = -1; i < 7; i++) {
+      const sg = somaDias(seg0, i * 7), atual = S.semanas[sg]?.planoId || "";
+      html += `<div class="row"><span class="m" style="flex:none;width:8.5em">${i === 0 ? "Esta semana" : "Semana " + dataCurta(sg).slice(4)}</span><select data-semana="${sg}" aria-label="Plano da semana de ${dataCurta(sg)}"><option value="">Sem plano</option>${lista.map(x => `<option value="${x.id}" ${x.id === atual ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `<div class="list">`;
+  lista.forEach(pl => {
+    const n = (pl.itens || []).length, nAq = (pl.itens || []).filter(i => parteDe(i) === "aquecimento").length, semanas = Object.entries(S.semanas).filter(([, w]) => w.planoId === pl.id).map(([k]) => k).sort();
+    html += `<button class="item" data-act="verPlano" data-id="${pl.id}"><div class="row"><span class="t">${esc(pl.nome)}</span>${chipTema(pl.tema)}</div>
+      <span class="m">Aquecimento ${nAq} · parte principal ${n - nAq}${(pl.material || []).length ? " · " + pl.material.length + " material" : ""}${semanas.length ? " · semana de " + semanas.map(k => dataCurta(k).slice(4)).join(", ") : ""}</span></button>`;
+  });
+  if (!lista.length) html += `<div class="empty">Ainda não há planos.${podeGerir() ? " Crie o primeiro com Novo plano." : ""}</div>`;
+  return html + `</div></section>`;
+}
+function verPlano(id) {
+  const pl = { id, ...S.planos[id] };
+  const el = abrirFolha(`<h2>${esc(pl.nome)}</h2>${htmlPlano(pl)}
+    <div class="actions">${podeGerir() ? `<button class="btn" id="vpEdit">Editar</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
+  $("#vpEdit", el)?.addEventListener("click", () => formPlano(id));
+}
+function optExercicios(sel, tema) {
+  const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), op = x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`;
+  return [tema, ...Object.keys(TEMAS).filter(t => t !== tema)].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(op).join("")}</optgroup>`).join("")
+    + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Outros">${exs.filter(x => !TEMAS[x.tema]).map(op).join("")}</optgroup>` : "");
+}
+function linhaItem(i, tema) {
+  return `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
+    <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optExercicios(i.exercicioId, tema)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
+    <input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições">
+    <input type="text" class="iObs" value="${esc(i.obs)}" placeholder="Observações" aria-label="Observações"></div>`;
+}
+function editorItens(itens, tema) {
+  return PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="ed_${k}">${(itens || []).filter(i => parteDe(i) === k).map(i => linhaItem(i, tema)).join("")}</div><button class="btn" data-edadd="${k}">+ Exercício no ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("");
+}
+function ligarEditorItens(el, tema) {
+  el.addEventListener("click", ev => {
+    const a = ev.target.closest("[data-edadd]"); if (a) $("#ed_" + a.dataset.edadd, el).insertAdjacentHTML("beforeend", linhaItem({ parte: a.dataset.edadd }, tema()));
+    const r = ev.target.closest("[data-item] [data-rm]"); if (r) r.closest("[data-item]").remove();
+  });
+}
+const lerItens = el => [...el.querySelectorAll("[data-item]")].map(r => ({ parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() })).filter(i => i.exercicioId);
+
+// op: { semana, tema, nome, depois } quando o plano é criado ao preparar o mês
+function formPlano(id, op = {}) {
+  const pl = id ? JSON.parse(JSON.stringify(S.planos[id])) : { nome: op.nome || "", tema: op.tema || temaDoMes(mesKey(new Date())) || "saltar", itens: [], material: [], notas: "" };
+  let tema = pl.tema;
+  const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), mats = sorted(S.material, (a, b) => a.nome.localeCompare(b.nome));
+  const optEx = sel => [tema, ...Object.keys(TEMAS).filter(t => t !== tema)].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</optgroup>`).join("")
+    + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Outros">${exs.filter(x => !TEMAS[x.tema]).map(x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</optgroup>` : "");
+  const linhaI = i => `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
+      <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optEx(i.exercicioId)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
+      <div class="row"><input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições"></div>
+      <input type="text" class="iObs" value="${esc(i.obs)}" placeholder="Observações" aria-label="Observações"></div>`;
+  const linhaM = m => `<div class="row" data-mat><select class="mId" aria-label="Material" style="flex:2"><option value="">Escolher material</option>${mats.map(x => `<option value="${x.id}" ${x.id === m.materialId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select><input type="text" class="mQtd" value="${esc(m.qtd)}" placeholder="Qtd." aria-label="Quantidade" style="flex:1"><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>`;
+  const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
+    <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
+    <div class="field"><span class="lbl">Tema</span><div class="seg" id="plTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+    ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("")}
+    ${exs.length ? "" : `<span class="m">Ainda não há exercícios na base de dados. Adicione-os em Exercícios.</span>`}
+    <div class="field"><span class="lbl">Material</span><div class="list" id="plMat">${(pl.material || []).map(linhaM).join("")}</div>${mats.length ? `<button class="btn" id="plAddM">Adicionar material</button>` : `<span class="m">Registe primeiro o material em Exercícios › Material.</span>`}</div>
+    <div class="field"><label for="plNotas">Notas gerais</label><textarea id="plNotas">${esc(pl.notas)}</textarea></div>
+    <div class="actions">${id ? `<button class="btn danger" id="plDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="plOk">Guardar</button></div>`);
+  const sync = () => $("#plTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tema)));
+  $("#plTema", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { tema = b.dataset.v; sync(); } });
+  sync();
+  el.querySelectorAll("[data-addparte]").forEach(b => b.addEventListener("click", () => $("#pl_" + b.dataset.addparte, el).insertAdjacentHTML("beforeend", linhaI({ parte: b.dataset.addparte }))));
+  $("#plAddM", el)?.addEventListener("click", () => $("#plMat", el).insertAdjacentHTML("beforeend", linhaM({})));
+  el.addEventListener("click", ev => { const b = ev.target.closest("[data-rm]"); if (b) b.closest("[data-item],[data-mat]").remove(); });
+  $("#plOk", el).addEventListener("click", async () => {
+    const nome = $("#plNome", el).value.trim(); if (!nome) return toast("Dê um nome ao plano");
+    const dados = { nome, tema, notas: $("#plNotas", el).value.trim(),
+      itens: [...el.querySelectorAll("[data-item]")].map(r => ({ parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() })).filter(i => i.exercicioId),
+      material: [...el.querySelectorAll("[data-mat]")].map(r => ({ materialId: r.querySelector(".mId").value, qtd: r.querySelector(".mQtd").value.trim() })).filter(m => m.materialId) };
+    const pid = id || novoId("pl");
+    try {
+      await guardar("planos", pid, dados);
+      if (op.semana) await guardar("semanas", op.semana, { planoId: pid });
+      fecharFolha(); toast("Plano guardado"); op.depois?.();
+    } catch (e) {}
+  });
+  $("#plDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("planos", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+}
+function viewMaterial() {
+  const lista = sorted(S.material, (a, b) => a.nome.localeCompare(b.nome));
+  let html = `<section><div class="sec-h"><h2>Material</h2><span class="sub">${lista.length}</span></div><button class="btn primary" data-act="novoMaterial">Adicionar material</button><div class="list">`;
+  lista.forEach(m => html += `<button class="item" data-act="editMaterial" data-id="${m.id}"><div class="row"><span class="t">${esc(m.nome)}</span>${m.quantidade ? `<span class="m">${esc(m.quantidade)} un.</span>` : ""}</div>
+    <span class="m">${[m.local, m.estado].filter(Boolean).map(esc).join(" · ")}</span></button>`);
+  if (!lista.length) html += `<div class="empty">Ainda não há material registado. Ex.: arcos, cones, elásticos, colchões.</div>`;
+  return html + `</div></section>`;
+}
+function formMaterial(id) {
+  const m = id ? S.material[id] : {};
+  const el = abrirFolha(`<h2>${id ? "Editar material" : "Novo material"}</h2>
+    <div class="field"><label for="maNome">Nome</label><input type="text" id="maNome" value="${esc(m.nome)}" placeholder="Ex.: Arcos"></div>
+    <div class="field"><label for="maQtd">Quantidade</label><input type="number" id="maQtd" value="${esc(m.quantidade)}"></div>
+    <div class="field"><label for="maLocal">Onde está guardado</label><input type="text" id="maLocal" value="${esc(m.local)}"></div>
+    <div class="field"><label for="maEstado">Estado</label><input type="text" id="maEstado" value="${esc(m.estado)}" placeholder="Ex.: bom, 2 partidos"></div>
+    <div class="field"><label for="maNotas">Notas</label><textarea id="maNotas">${esc(m.notas)}</textarea></div>
+    <div class="actions">${id ? `<button class="btn danger" id="maDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="maOk">Guardar</button></div>`);
+  $("#maOk", el).addEventListener("click", async () => {
+    const nome = $("#maNome", el).value.trim(); if (!nome) return toast("Escreva o nome do material");
+    try { await guardar("material", id || novoId("m"), { nome, quantidade: $("#maQtd", el).value.trim(), local: $("#maLocal", el).value.trim(), estado: $("#maEstado", el).value.trim(), notas: $("#maNotas", el).value.trim() }); fecharFolha(); toast("Material guardado"); } catch (e) {}
+  });
+  $("#maDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("material", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+}
+
+// ---------- AVALIAÇÕES ----------
+let avalPendente = null, avalTimer = null;
+function avalId() { return `${avalSel.equipaId}_${avalSel.tema}_${avalSel.mes}`; }
+function mesAnterior(k) { const [y, m] = k.split("-").map(Number); return mesKey(new Date(y, m - 2, 1)); }
+function viewAvaliacoes() {
+  if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa, numa escala de 1 (não realiza) a 4 (domina). Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}${viewEvolucao()}</section>`;
+  const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade));
+  if (!avalSel.equipaId || !S.equipas[avalSel.equipaId]) avalSel.equipaId = equipas[0]?.id;
+  if (!avalSel.equipaId) return `<section><div class="empty">Crie primeiro uma equipa em Mais.</div></section>`;
+  const atual = avalPendente && avalPendente.id === avalId() ? avalPendente.dados : (S.avaliacoes[avalId()] || { resultados: {} });
+  const anterior = S.avaliacoes[`${avalSel.equipaId}_${avalSel.tema}_${mesAnterior(avalSel.mes)}`]?.resultados || {};
+  const atletas = sorted(S.atletas, (a, b) => a.nome.localeCompare(b.nome)).filter(a => a.equipaId === avalSel.equipaId);
+  const feitos = atletas.filter(a => atual.resultados?.[a.id]).length;
+
+  let html = `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
+    <div class="field"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
+    <div class="row" style="align-items:end"><div class="field" style="flex:1"><span class="lbl">Tema</span><div class="seg" id="aTema">${TEMAS_AVALIADOS.map(t => `<button data-v="${t}" aria-pressed="${t === avalSel.tema}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+    <div class="field" style="width:10.5em"><label for="aMes">Mês</label><input type="month" id="aMes" value="${avalSel.mes}" ></div></div>
+    <p class="legend">${Object.entries(ESCALA).map(([k, v]) => `<b>${k}</b> ${v}`).join(" · ")}</p>
+    <div class="list">`;
+  if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Adicione-os abaixo (um nome por linha).</div>`;
+  atletas.forEach(a => {
+    const v = atual.resultados?.[a.id], p = anterior[a.id];
+    html += `<div class="item aval"><div class="who"><span class="t">${esc(a.nome)}</span><span class="prev">${p ? `mês anterior: ${p}` : ""}</span></div>
+      <div class="scale" data-atleta="${a.id}">${[1, 2, 3, 4].map(n => `<button data-n="${n}" aria-pressed="${v === n}" aria-label="${ESCALA[n]}">${n}</button>`).join("")}</div></div>`;
+  });
+  html += `</div>
+    <div class="field"><label for="aObs">Observações da avaliação</label><textarea id="aObs">${esc(atual.obs)}</textarea></div>
+    <details ${atletas.length ? "" : "open"}><summary class="btn ghost" style="display:inline-block">Adicionar atletas</summary>
+      <div class="field" style="margin-top:8px"><textarea id="aNovos" placeholder="Um nome por linha"></textarea><button class="btn" id="aAdd">Adicionar à equipa</button></div></details>
+  </section>`;
+  return html + viewEvolucao();
+}
+function viewEvolucao() {
+  // médias por equipa e mês (agregado, sem nomes)
+  const linhas = {};
+  Object.entries(S.avaliacoes).forEach(([id, a]) => {
+    const vals = Object.values(a.resultados || {}).filter(Boolean); if (!vals.length || !EQ()[a.equipaId]) return;
+    const key = a.equipaId + "|" + a.tema;
+    (linhas[key] = linhas[key] || []).push({ mes: a.mes, media: vals.reduce((x, y) => x + y, 0) / vals.length, n: vals.length });
+  });
+  const keys = Object.keys(linhas);
+  if (!keys.length) return "";
+  let html = `<section><div class="sec-h"><h2>Evolução por equipa</h2><span class="sub">média 1 a 4</span></div><div class="list">`;
+  keys.sort().forEach(k => {
+    const [eq, tema] = k.split("|");
+    html += `<div class="item"><div class="row"><span class="t">${esc(equipaNome(eq))}</span>${chipTema(tema)}</div>`;
+    linhas[k].sort((a, b) => a.mes.localeCompare(b.mes)).forEach(l => {
+      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / 4 * 100}%;background:var(--${tema})"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
+    });
+    html += `</div>`;
+  });
+  return html + `</div></section>`;
+}
+function guardarAval(alterar) {
+  const id = avalId();
+  if (!avalPendente || avalPendente.id !== id) {
+    const base = S.avaliacoes[id] || {};
+    avalPendente = { id, dados: { equipaId: avalSel.equipaId, tema: avalSel.tema, mes: avalSel.mes, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
+  }
+  alterar(avalPendente.dados);
+  clearTimeout(avalTimer);
+  avalTimer = setTimeout(async () => {
+    const p = avalPendente; if (!p) return;
+    p.dados.atualizadoEm = Date.now();
+    try { await guardar("avaliacoes", p.id, JSON.parse(JSON.stringify(p.dados))); toast("Avaliação guardada"); } catch (e) {}
+    if (avalPendente === p) avalPendente = null;
+  }, 700);
+}
+
+// ---------- MAIS ----------
+function viewMais() {
+  const k0 = mesKey(new Date());
+  const inicio = anoEpoca(epocaVista()); // época de setembro a junho
+  const meses = []; for (let i = 0; i < 10; i++) meses.push(mesKey(new Date(inicio, 8 + i, 1)));
+  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
+  meses.forEach(k => {
+    const p = S.plano[k];
+    html += `<button class="item" data-act="editPlano" data-id="${k}" ${podeGerir() ? "" : "disabled"} style="${k === k0 ? "border-color:var(--accent)" : ""}">
+      <div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(p.tema) : `<span class="m">Por definir</span>`}</div>
+      ${p?.foco ? `<span class="m">${esc(p.foco)}</span>` : ""}
+      ${podeGerir() ? (() => { const sm = semanasDoMes(k), n = sm.filter(sg => S.planos[S.semanas[sg]?.planoId]).length; return `<span class="m">${n} de ${sm.length} semanas com plano</span>`; })() : ""}</button>`;
+  });
+  html += `</div></section>`;
+
+  if (podeEscrever()) {
+    html += `<section><div class="sec-h"><h2>Modalidades</h2><span class="sub">${Object.keys(S.equipas).length} escalões</span></div><span class="m">Treinos de cada escalão, treinadores e horário da nossa intervenção.</span><div class="list">`;
+    sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade) || (a.escalao || "").localeCompare(b.escalao || "")).forEach(e => {
+      const ord = horarioDe(e).slice().sort((x, y) => ((x.dia + 6) % 7) - ((y.dia + 6) % 7));
+      const tr = ordDias(e.treinos || []), trein = (e.treinadores || []).map(pessoaNome).filter(Boolean);
+      html += `<button class="item" data-act="verEquipa" data-id="${e.id}">
+        <div class="row"><span class="t">${esc(equipaNome(e.id))}</span>${e.ativa === false ? `<span class="chip warn">Ainda não ativa</span>` : ""}</div>
+        <span class="m"><b>Treinos:</b> ${tr.map(t => `${DIAS[t.dia]} ${esc(t.inicio)}${t.fim ? "–" + esc(t.fim) : ""}`).join(", ") || "por indicar"}</span>
+        <span class="m"><b>Intervenção:</b> ${ord.map(h => `${DIAS[h.dia]} ${esc(h.hora)} · ${esc(h.local)}`).join(", ") || "por indicar"}${pessoaNome(e.responsavel) ? " · " + esc(pessoaNome(e.responsavel)) : ""}</span>
+        ${trein.length ? `<span class="m"><b>Treinadores:</b> ${trein.map(esc).join(", ")}</span>` : ""}</button>`;
+    });
+    html += `</div><button class="btn" data-act="editEquipa">Adicionar modalidade / escalão</button></section>`;
+  }
+
+  const acessos = sorted(S.acessos, (a, b) => a.id.localeCompare(b.id));
+  html += `<section><div class="sec-h"><h2>Acessos</h2></div>
+    <div class="item"><span class="t">${sessao ? esc(sessao.user.email) + " · " + role.nome : "Modo de consulta"}</span>
+      <span class="m">${role.nivel === "admin" ? "Pode editar tudo e gerir os acessos." : role.nivel === "write" ? "Pode registar sessões, notas internas e avaliações, e ajustar horários." : "Pode ver o plano, os exercícios, o horário e o resumo das sessões. Contactos, notas internas e avaliações individuais só aparecem à equipa técnica."}</span>
+      ${sessao && role.nivel === "view" ? `<span class="m">Se é da equipa técnica, peça ao coordenador para adicionar o seu email.</span>` : ""}
+      <div class="actions" style="justify-content:flex-start">${sessao ? `<button class="btn" id="sair">Sair</button>` : `<button class="btn primary" id="entrar">Entrar</button>`}<button class="btn" id="copiarLink">Copiar link para pais e treinadores</button></div></div>`;
+  if (podeGerir()) {
+    html += `<div class="item"><span class="t">Equipa técnica com acesso</span>
+      <span class="m">Adicione o email da pessoa e o papel. Ela entra em Entrar › Criar conta com esse email. Pais, treinadores e direção não precisam de conta: basta o link.</span>
+      ${acessos.map(a => `<div class="row"><span>${esc(a.nome || a.id)}<br><span class="m">${esc(a.id)} · ${a.papel === "coordenador" ? "Coordenação" : "Preparação física"}</span></span>${a.id !== sessao?.user.email?.toLowerCase() ? `<button class="btn danger" data-rmacesso="${esc(a.id)}">Remover</button>` : ""}</div>`).join("")}
+      <div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" placeholder="nome@exemplo.pt"></div>
+      <div class="field"><label for="acNome">Nome</label><input type="text" id="acNome"></div>
+      <div class="field"><label for="acPapel">Papel</label><select id="acPapel"><option value="preparador">Preparação física (regista e ajusta horários)</option><option value="coordenador">Coordenação (acesso total)</option></select></div>
+      <button class="btn primary" id="acAdd">Dar acesso</button></div>`;
+    if (Object.values(S.sessoes).some(s => s.exemplo)) html += `<button class="btn danger" id="limparEx">Apagar sessões de exemplo</button>`;
+  }
+  html += `</section>`;
+  return html;
+}
+// semanas (segunda-feira) que têm dias de sessão dentro do mês
+function semanasDoMes(k) {
+  const [y, m] = k.split("-").map(Number), fim = isoDe(new Date(y, m, 0)), out = [];
+  for (let sg = segundaDe(k + "-01"); sg <= fim; sg = somaDias(sg, 7)) out.push(sg);
+  return out;
+}
+function editPlano(k, rasc) {
+  const p = rasc || S.plano[k] || { tema: "saltar", foco: "" };
+  let tema = p.tema;
+  const planos = sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome));
+  const sem = semanasDoMes(k);
+  const el = abrirFolha(`<h2 style="text-transform:capitalize">Preparar ${mesNome(k)}</h2>
+    <div class="field"><span class="lbl">Tema do mês</span><div class="seg" id="pTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+    <div class="field"><label for="pFoco">Foco / objetivo</label><input type="text" id="pFoco" value="${esc(p.foco)}"></div>
+    <div class="field"><span class="lbl">Sessões de cada semana</span><span class="m">Para cada semana, crie o plano (aquecimento e parte principal com exercícios da base de dados) ou escolha um que já exista.</span>
+    <div class="list">${sem.map((sg, i) => { const pid = S.semanas[sg]?.planoId, pl = pid && S.planos[pid];
+      return `<div class="item"><div class="row"><span class="t">Semana ${i + 1}</span><span class="m">${dataCurta(sg).slice(4)} a ${dataCurta(somaDias(sg, 6)).slice(4)}</span></div>
+        <select data-psem="${sg}" aria-label="Plano da semana ${i + 1}"><option value="">Sem plano</option>${planos.map(x => `<option value="${x.id}" ${x.id === pid ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select>
+        ${pl ? `<span class="m">Aquecimento: ${(pl.itens || []).filter(x => parteDe(x) === "aquecimento").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}<br>Principal: ${(pl.itens || []).filter(x => parteDe(x) === "principal").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}</span>` : ""}
+        <div class="actions" style="justify-content:flex-start">${pl ? `<button class="btn" data-pedit="${pid}">Editar plano</button>` : ""}<button class="btn${pl ? " ghost" : ""}" data-pnovo="${sg}" data-n="${i + 1}">Criar plano novo</button></div></div>`; }).join("")}</div></div>
+    <div class="actions">${S.plano[k] ? `<button class="btn danger" id="pDel">Limpar tema</button>` : ""}<button class="btn" data-close>Fechar</button><button class="btn primary" id="pOk">Guardar tema</button></div>`);
+  const sync = () => $("#pTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tema)));
+  $("#pTema", el).addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tema = b.dataset.v; sync(); } });
+  sync();
+  const voltar = () => editPlano(k, { tema, foco: $("#pFoco", el).value });
+  el.querySelectorAll("[data-psem]").forEach(s2 => s2.addEventListener("change", async () => {
+    const sg = s2.dataset.psem; await (s2.value ? guardar("semanas", sg, { planoId: s2.value }) : apagar("semanas", sg)).catch(() => {}); voltar();
+  }));
+  el.querySelectorAll("[data-pedit]").forEach(b => b.addEventListener("click", () => { const r = { tema, foco: $("#pFoco", el).value }; formPlano(b.dataset.pedit, { depois: () => editPlano(k, r) }); }));
+  el.querySelectorAll("[data-pnovo]").forEach(b => b.addEventListener("click", () => { const r = { tema, foco: $("#pFoco", el).value };
+    formPlano(null, { semana: b.dataset.pnovo, tema, nome: `${TEMAS[tema].nome} · ${MESES[+k.slice(5) - 1].slice(0, 3)} · semana ${b.dataset.n}`, depois: () => editPlano(k, r) }); }));
+  $("#pOk", el).addEventListener("click", async () => {
+    try { await guardar("plano", k, { tema, foco: $("#pFoco", el).value.trim() }); fecharFolha(); toast("Tema do mês guardado"); } catch (e) {}
+  });
+  $("#pDel", el)?.addEventListener("click", () => { apagar("plano", k); fecharFolha(); });
+}
+let semOffset = 0;
+function viewSemana() {
+  if (!podeEscrever()) return "";
+  const hoje = new Date(), seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7) + semOffset * 7);
+  const de = isoDe(seg), ate = somaDias(de, 6), lista = previstas(de, ate);
+  const fim = new Date(ate + "T12:00");
+  let html = `<section><div class="sec-h"><h2>Horário da semana</h2><span class="sub">área da equipa técnica</span></div>
+    <div class="row"><button class="btn" data-sem="-1" aria-label="Semana anterior">‹</button><span class="t">${seg.getDate()} ${MESES[seg.getMonth()].slice(0, 3)} a ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)}${semOffset === 0 ? " · esta semana" : ""}</span><button class="btn" data-sem="1" aria-label="Semana seguinte">›</button></div>
+    <div class="list">`;
+  for (let i = 0; i < 7; i++) {
+    const d = somaDias(de, i), doDia = lista.filter(p => p.data === d);
+    if (!doDia.length) continue;
+    html += `<div class="item"><span class="lbl" style="${d === hojeISO() ? "color:var(--accent)" : ""}">${dataCurta(d)}${d === hojeISO() ? " · hoje" : ""}</span>`;
+    doDia.forEach(p => {
+      const alterada = p.cancelada || p.mudada || p.mudouLocal || p.mudouHora;
+      html += `<div class="row" style="align-items:flex-start"><span><span class="t" style="${p.cancelada ? "text-decoration:line-through" : ""}">${esc(equipaNome(p.equipaId))}</span><br><span class="m">${esc(p.hora)} · ${esc(p.local)}${p.cancelada ? " · não há: " + esc(p.motivo) : p.mudada ? " · mudada de " + dataCurta(p.mudada) + (p.motivo ? " (" + esc(p.motivo) + ")" : "") : p.motivo && alterada ? " · " + esc(p.motivo) : ""}</span></span>
+        <button class="btn ${alterada ? "" : "ghost"}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">${alterada ? "Alterada" : "Alterar"}</button></div>`;
+    });
+    html += `</div>`;
+  }
+  if (!lista.length) html += `<div class="empty">Sem treinos nesta semana.</div>`;
+  return html + `</div></section>`;
+}
+function tarefasAbertas() {
+  return Object.entries(S.reunioes).flatMap(([rid, r]) => (r.tarefas || []).map((t, i) => ({ ...t, rid, i, reuniao: r.data }))).filter(t => !t.feito && t.texto)
+    .sort((a, b) => (a.prazo || "9999").localeCompare(b.prazo || "9999"));
+}
+function itemTarefa(t) {
+  const atrasada = t.prazo && t.prazo < hojeISO();
+  return `<label class="item" style="grid-template-columns:auto 1fr;align-items:start;gap:10px;cursor:pointer"><input type="checkbox" data-tarefa="${t.rid}|${t.i}" ${t.feito ? "checked" : ""} style="width:22px;height:22px;margin-top:2px">
+    <span><span class="t">${esc(t.texto)}</span><br><span class="m">${pessoaNome(t.responsavel) ? esc(pessoaNome(t.responsavel)) + " · " : ""}${t.prazo ? `<span class="${atrasada ? "bad" : ""}">até ${dataCurta(t.prazo)}</span>` : "sem prazo"}</span></span></label>`;
+}
+function viewEpocas() {
+  if (!podeEscrever()) return "";
+  const atual = epocaDe(hojeISO()), prox = epocaSeguinte(atual), eps = epocasConhecidas();
+  let html = `<section><div class="sec-h"><h2>Época</h2><span class="sub">${Object.keys(EQ()).length} escalões</span></div>
+    <div class="seg" id="epSel">${eps.map(ep => `<button data-ep="${ep}" aria-pressed="${ep === epocaVista()}">${ep}${ep === atual ? " (atual)" : ""}</button>`).join("")}</div>`;
+  if (podeGerir() && !eps.includes(prox)) html += `<button class="btn" id="epNova">Preparar a época ${prox}</button><span class="m">Copia as modalidades, escalões, horários e treinadores desta época para a seguinte. Depois ajusta-se o que mudar (novos escalões, modalidades, atletas). Os dados desta época ficam guardados.</span>`;
+  return html + `</section>`;
+}
+function viewReunioes() {
+  if (!podeGerir()) return "";
+  const lista = sorted(S.reunioes, (a, b) => b.data.localeCompare(a.data) || (b.hora || "").localeCompare(a.hora || ""));
+  const abertas = tarefasAbertas();
+  let html = `<section><div class="sec-h"><h2>Reuniões</h2><span class="sub">${lista.length}</span></div>
+    <button class="btn primary" data-act="reuniao">Registar reunião</button>`;
+  if (abertas.length) html += `<span class="lbl">Tarefas por fazer (${abertas.length})</span><div class="list">${abertas.slice(0, 8).map(itemTarefa).join("")}</div>`;
+  html += `<div class="list">`;
+  lista.slice(0, 12).forEach(r => {
+    const ab = (r.tarefas || []).filter(t => !t.feito && t.texto).length;
+    html += `<button class="item" data-act="reuniao" data-id="${r.id}">
+      <div class="row"><span class="t">${dataCurta(r.data)}${r.hora ? " · " + esc(r.hora) : ""}</span><span class="chip" style="color:var(--muted)">${r.tipo === "online" ? "Online" : "Presencial"}</span></div>
+      <span class="m">${esc(r.local || "")}${(r.participantes || []).length ? " · " + r.participantes.map(pessoaNome).filter(Boolean).map(esc).join(", ") : ""}</span>
+      ${r.objetivos ? `<span class="m">${esc(r.objetivos.slice(0, 120))}${r.objetivos.length > 120 ? "…" : ""}</span>` : ""}
+      ${(r.tarefas || []).length ? `<span class="m">${ab ? ab + " tarefa(s) por fazer" : "Todas as tarefas feitas"}</span>` : ""}</button>`;
+  });
+  if (!lista.length) html += `<div class="empty">Ainda não há reuniões registadas.</div>`;
+  return html + `</div></section>`;
+}
+function formReuniao(id) {
+  const r = id ? JSON.parse(JSON.stringify(S.reunioes[id])) : { data: hojeISO(), hora: "", tipo: "presencial", local: "", participantes: [], objetivos: "", notas: "", tarefas: [] };
+  let tipo = r.tipo; const part = (r.participantes || []).slice();
+  const pessoas = sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome));
+  const linhaT = (t, i) => `<div class="item" style="padding:8px 10px" data-t="${i}">
+      <div class="row"><input type="checkbox" class="tFeito" ${t.feito ? "checked" : ""} aria-label="Feita" style="width:22px;height:22px;flex:none"><input type="text" class="tTexto" value="${esc(t.texto)}" placeholder="O que há a fazer"></div>
+      <div class="row"><select class="tResp" aria-label="Responsável" style="flex:1"><option value="">Responsável</option>${pessoas.map(p => `<option value="${p.id}" ${p.id === t.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select><input type="date" class="tPrazo" value="${t.prazo || ""}" aria-label="Prazo" style="flex:1"></div></div>`;
+  const el = abrirFolha(`<h2>${id ? "Reunião" : "Registar reunião"}</h2>
+    <div class="row"><div class="field" style="flex:1"><label for="rData">Data</label><input type="date" id="rData" value="${r.data}"></div>
+      <div class="field" style="flex:1"><label for="rHora">Hora</label><input type="text" id="rHora" value="${esc(r.hora)}" placeholder="10:00"></div></div>
+    <div class="field"><span class="lbl">Tipo</span><div class="seg" id="rTipo"><button data-v="presencial">Presencial</button><button data-v="online">Online</button></div></div>
+    <div class="field"><label for="rLocal" id="rLocalLbl">Local</label><input type="text" id="rLocal" value="${esc(r.local)}"></div>
+    <div class="field"><span class="lbl">Participantes</span><div class="seg" id="rPart">${pessoas.map(p => `<button data-v="${p.id}" aria-pressed="${part.includes(p.id)}">${esc(p.nome)}</button>`).join("") || `<span class="m">Adicione pessoas em Mais › Pessoas.</span>`}</div></div>
+    <div class="field"><label for="rObj">Objetivos</label><textarea id="rObj" placeholder="O que se quer decidir ou preparar">${esc(r.objetivos)}</textarea></div>
+    <div class="field"><label for="rNotas">O que ficou decidido</label><textarea id="rNotas">${esc(r.notas)}</textarea></div>
+    <div class="field"><span class="lbl">Tarefas para depois da reunião</span><div class="list" id="rTarefas">${(r.tarefas || []).map(linhaT).join("")}</div><button class="btn" id="rAddT">Adicionar tarefa</button></div>
+    <div class="actions">${id ? `<button class="btn danger" id="rDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rOk">Guardar</button></div>`);
+  const sync = () => { $("#rTipo", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tipo))); $("#rLocalLbl", el).textContent = tipo === "online" ? "Plataforma ou link (Teams, Zoom…)" : "Local"; };
+  $("#rTipo", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { tipo = b.dataset.v; sync(); } });
+  $("#rPart", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = part.indexOf(b.dataset.v); i >= 0 ? part.splice(i, 1) : part.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
+  $("#rAddT", el).addEventListener("click", () => { const box = $("#rTarefas", el); box.insertAdjacentHTML("beforeend", linhaT({}, box.children.length)); box.lastElementChild.querySelector(".tTexto").focus(); });
+  sync();
+  $("#rOk", el).addEventListener("click", async () => {
+    const tarefas = [...el.querySelectorAll("[data-t]")].map(x => ({ texto: x.querySelector(".tTexto").value.trim(), responsavel: x.querySelector(".tResp").value || null, prazo: x.querySelector(".tPrazo").value || null, feito: x.querySelector(".tFeito").checked })).filter(t => t.texto);
+    const dados = { data: $("#rData", el).value || hojeISO(), hora: $("#rHora", el).value.trim(), tipo, local: $("#rLocal", el).value.trim(), participantes: part, objetivos: $("#rObj", el).value.trim(), notas: $("#rNotas", el).value.trim(), tarefas, criadoEm: r.criadoEm || Date.now() };
+    try { await guardar("reunioes", id || novoId("r"), dados); fecharFolha(); toast("Reunião guardada"); } catch (e) {}
+  });
+  $("#rDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("reunioes", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+}
+function viewPessoas() {
+  if (!podeEscrever()) return "";
+  const lista = sorted(S.pessoas, (a, b) => FUNCOES.indexOf(a.funcao) - FUNCOES.indexOf(b.funcao) || a.nome.localeCompare(b.nome));
+  let html = `<section><div class="sec-h"><h2>Pessoas</h2><span class="sub">${lista.length}</span></div><div class="list">`;
+  if (!lista.length) html += `<div class="empty">Ainda não há pessoas registadas. Adicione treinadores, coordenadores e preparadores físicos com os contactos.</div>`;
+  lista.forEach(p => {
+    const eqs = Object.entries(S.equipas).filter(([, e]) => e.responsavel === p.id || (e.treinadores || []).includes(p.id)).map(([id]) => equipaNome(id));
+    html += `<button class="item" data-act="verPessoa" data-id="${p.id}">
+      <div class="row"><span class="t">${esc(p.nome)}</span><span class="chip" style="color:var(--muted)">${esc(cargo(p))}</span></div>
+      ${eqs.length ? `<span class="m">${eqs.map(esc).join(", ")}</span>` : ""}
+      <span class="m">${[p.telefone, p.email].filter(Boolean).map(esc).join(" · ")}</span></button>`;
+  });
+  html += `</div><button class="btn" data-act="editPessoa">Adicionar pessoa</button></section>`;
+  return html;
+}
+function copiar(txt, btn) {
+  const ok = () => { btn.textContent = "Copiado"; setTimeout(() => btn.textContent = "Copiar", 1500); };
+  try { navigator.clipboard.writeText(txt).then(ok, () => toast(txt)); } catch (e) { toast(txt); }
+}
+function verPessoa(id) {
+  const p = { id, ...S.pessoas[id] };
+  const eqs = Object.entries(S.equipas).filter(([, e]) => e.responsavel === id || (e.treinadores || []).includes(id)).map(([eid, e]) => equipaNome(eid) + (e.responsavel === id ? " (responsável)" : ""));
+  const contacto = (lbl, v, href) => v ? `<div class="field"><span class="lbl">${lbl}</span><div class="row"><a href="${href}${esc(v.replace(/\s/g, ""))}" style="user-select:all">${esc(v)}</a><button class="btn" data-copy="${esc(v)}">Copiar</button></div></div>` : "";
+  const el = abrirFolha(`<h2>${esc(p.nome)}</h2><span class="m">${esc(cargo(p))}</span>
+    ${contacto("Telemóvel", p.telefone, "tel:")}${contacto("Email", p.email, "mailto:")}
+    ${eqs.length ? `<div class="field"><span class="lbl">Equipas</span><span>${eqs.map(esc).join("<br>")}</span></div>` : ""}
+    ${p.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(p.notas)}</span></div>` : ""}
+    <div class="actions">${podeEscrever() ? `<button class="btn" id="pEdit">Editar</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
+  el.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copiar(b.dataset.copy, b)));
+  $("#pEdit", el)?.addEventListener("click", () => editPessoa(id));
+}
+function editPessoa(id) {
+  const p = id ? S.pessoas[id] : { funcao: "Treinador" };
+  const el = abrirFolha(`<h2>${id ? "Editar pessoa" : "Nova pessoa"}</h2>
+    <div class="field"><label for="pNome">Nome</label><input type="text" id="pNome" value="${esc(p.nome)}"></div>
+    <div class="field"><span class="lbl">Função</span><div class="seg" id="pFun">${FUNCOES.map(f => `<button data-v="${f}" aria-pressed="${f === p.funcao}">${f}</button>`).join("")}</div></div>
+    <div class="field"><label for="pMod">Modalidade (se for de uma modalidade)</label><input type="text" id="pMod" value="${esc(p.modalidade)}" list="pMods"><datalist id="pMods">${modalidades().map(m => `<option>${esc(m)}</option>`).join("")}</datalist></div>
+    <div class="field"><label for="pTel">Telemóvel</label><input type="tel" id="pTel" value="${esc(p.telefone)}" inputmode="tel"></div>
+    <div class="field"><label for="pMail">Email</label><input type="email" id="pMail" value="${esc(p.email)}"></div>
+    <div class="field"><label for="pNotas">Notas</label><textarea id="pNotas">${esc(p.notas)}</textarea></div>
+    <span class="m">O preparador responsável e os treinadores de cada escalão definem-se em Mais › Modalidades.</span>
+    <div class="actions">${id ? `<button class="btn danger" id="pDel2">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="pOk2">Guardar</button></div>`);
+  let funcao = p.funcao;
+  $("#pFun", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; funcao = b.dataset.v; $("#pFun", el).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); });
+  $("#pOk2", el).addEventListener("click", async () => {
+    const nome = $("#pNome", el).value.trim(); if (!nome) return toast("Escreva o nome");
+    try { await guardar("pessoas", id || novoId("p"), { nome, funcao, modalidade: $("#pMod", el).value.trim(), telefone: $("#pTel", el).value.trim(), email: $("#pMail", el).value.trim(), notas: $("#pNotas", el).value.trim() }); fecharFolha(); toast("Pessoa guardada"); } catch (e) {}
+  });
+  $("#pDel2", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("pessoas", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+}
+function ordDias(l) { return l.slice().sort((x, y) => ((x.dia + 6) % 7) - ((y.dia + 6) % 7)); }
+function linhaContacto(lbl, v, href) { return v ? `<div class="row"><span class="m">${lbl}: <a href="${href}${esc(v.replace(/\s/g, ""))}" style="user-select:all">${esc(v)}</a></span><button class="btn" data-copy="${esc(v)}">Copiar</button></div>` : ""; }
+function verEquipa(id) {
+  const e = S.equipas[id];
+  const tr = ordDias(e.treinos || []), iv = ordDias(horarioDe(e));
+  const trein = (e.treinadores || []).map(pid => ({ id: pid, ...S.pessoas[pid] })).filter(p => p.nome);
+  const el = abrirFolha(`<h2>${esc(equipaNome(id))}</h2>
+    ${e.ativa === false ? `<span class="chip warn" style="justify-self:start">Ainda não ativa</span>` : ""}
+    <div class="field"><span class="lbl">Treinos da equipa</span>${tr.map(t => `<span><b>${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][t.dia]}</b> ${esc(t.inicio)}${t.fim ? "–" + esc(t.fim) : ""}${t.local ? " · " + esc(t.local) : ""}</span>`).join("") || `<span class="m">Por indicar</span>`}</div>
+    <div class="field"><span class="lbl">Intervenção da Escola do Movimento</span>${iv.map(h => `<span><b>${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][h.dia]}</b> ${esc(h.hora)} · ${esc(h.local)} · ${h.duracao || 20} min</span>`).join("") || `<span class="m">Por indicar</span>`}
+      ${pessoaNome(e.responsavel) ? `<span class="m">Preparador físico: ${esc(pessoaNome(e.responsavel))}</span>` : ""}</div>
+    <div class="field"><span class="lbl">Treinadores</span>${trein.map(p => `<div class="item" style="padding:8px 10px"><span class="t">${esc(p.nome)}</span>${linhaContacto("Telemóvel", p.telefone, "tel:")}${linhaContacto("Email", p.email, "mailto:")}${!p.telefone && !p.email ? `<span class="m">Sem contactos</span>` : ""}</div>`).join("") || `<span class="m">Por indicar</span>`}</div>
+    <div class="actions"><button class="btn" id="eqEdit">Editar</button><button class="btn" data-close>Fechar</button></div>`);
+  el.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copiar(b.dataset.copy, b)));
+  $("#eqEdit", el).addEventListener("click", () => editEquipa(id));
+}
+function horarioDoForm(el) {
+  const horario = [...el.querySelectorAll("[data-dia]")].filter(r => r.querySelector(".hOn").checked).map(r => ({
+    dia: +r.dataset.dia, hora: r.querySelector(".hHora").value.trim(), local: r.querySelector(".hLocal").value.trim(), duracao: +r.querySelector(".hDur").value || 20 }));
+  const h0 = horario[0] || {};
+  return { horario, dias: horario.map(h => h.dia), hora: h0.hora || "", local: h0.local || "", duracao: h0.duracao || 20 };
+}
+function editEquipa(id) {
+  const e = id ? S.equipas[id] : { modalidade: "", escalao: "", horario: [] };
+  const hor = horarioDe(e), treinadores = (e.treinadores || []).slice(), treinos = e.treinos || [];
+  const linhaTr = d => { const t = treinos.find(x => x.dia === d); return `<div class="item" style="padding:8px 10px" data-tdia="${d}">
+      <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" class="tOn" ${t ? "checked" : ""} style="width:22px;height:22px"><span class="t">${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][d]}</span></label>
+      <div class="row tCampos" ${t ? "" : "hidden"}><input type="text" class="tIni" value="${esc(t?.inicio || "")}" placeholder="Início" aria-label="Hora de início" style="flex:1"><input type="text" class="tFim" value="${esc(t?.fim || "")}" placeholder="Fim" aria-label="Hora de fim" style="flex:1"><input type="text" class="tLoc" value="${esc(t?.local || treinos[0]?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local do treino" style="flex:2"></div></div>`; };
+  const linha = d => { const h = hor.find(x => x.dia === d); return `<div class="item" style="padding:8px 10px" data-dia="${d}">
+      <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" class="hOn" ${h ? "checked" : ""} style="width:22px;height:22px"><span class="t">${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][d]}</span></label>
+      <div class="row hCampos" ${h ? "" : "hidden"}><input type="text" class="hHora" value="${esc(h?.hora || hor[0]?.hora || "")}" placeholder="18:30" aria-label="Hora" style="flex:1"><input type="text" class="hLocal" value="${esc(h?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local" style="flex:2"><input type="number" class="hDur" value="${h?.duracao || hor[0]?.duracao || 20}" aria-label="Duração em minutos" style="flex:1"></div></div>`; };
+  const el = abrirFolha(`<h2>${id ? "Editar escalão" : "Nova modalidade / escalão"}</h2>
+    <div class="field"><label for="qMod">Modalidade</label><input type="text" id="qMod" value="${esc(e.modalidade)}" list="mods">
+      <datalist id="mods"><option>Andebol</option><option>Futsal</option><option>Basquetebol</option><option>Voleibol</option><option>Hóquei em patins</option><option>Natação</option></datalist></div>
+    <div class="field"><label for="qEsc">Escalão</label><input type="text" id="qEsc" value="${esc(e.escalao)}" placeholder="Sub-12"></div>
+    <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="qAtiva" ${e.ativa === false ? "" : "checked"} style="width:22px;height:22px"><span>Em funcionamento (desmarque se ainda não arrancou)</span></label>
+    <div class="field"><span class="lbl">Treinos da equipa (início · fim · local)</span><div class="list" id="qTr">${[1, 2, 3, 4, 5, 6, 0].map(linhaTr).join("")}</div></div>
+    <div class="field"><span class="lbl">Intervenção da Escola do Movimento (hora · local · minutos)</span><div class="list" id="qHor">${[1, 2, 3, 4, 5, 6, 0].map(linha).join("")}</div></div>
+    <div class="field"><label for="qResp">Preparador físico responsável</label><select id="qResp"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}" ${p.id === e.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select></div>
+    <div class="field"><span class="lbl">Treinadores</span><div class="seg" id="qTrein">${sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome)).filter(p => p.funcao === "Treinador").map(p => `<button data-v="${p.id}" aria-pressed="${treinadores.includes(p.id)}">${esc(p.nome)}</button>`).join("") || ""}</div>
+      <details><summary class="btn ghost" style="display:inline-block">Novo treinador</summary><div class="field" style="margin-top:8px">
+        <input type="text" id="ntNome" placeholder="Nome" aria-label="Nome do treinador"><input type="tel" id="ntTel" placeholder="Telemóvel" aria-label="Telemóvel"><input type="email" id="ntMail" placeholder="Email" aria-label="Email"><button class="btn" id="ntAdd">Adicionar treinador</button></div></details></div>
+    <div class="actions">${id && podeGerir() ? `<button class="btn danger" id="qDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="qOk">Guardar</button></div>`);
+  $("#qTr", el).addEventListener("change", ev => { if (ev.target.classList.contains("tOn")) ev.target.closest("[data-tdia]").querySelector(".tCampos").hidden = !ev.target.checked; });
+  $("#ntAdd", el).addEventListener("click", async () => {
+    const nome = $("#ntNome", el).value.trim(); if (!nome) return toast("Escreva o nome do treinador");
+    const pid = novoId("p");
+    try {
+      await guardar("pessoas", pid, { nome, funcao: "Treinador", modalidade: $("#qMod", el).value.trim(), telefone: $("#ntTel", el).value.trim(), email: $("#ntMail", el).value.trim(), notas: "" });
+      treinadores.push(pid);
+      $("#qTrein", el).insertAdjacentHTML("beforeend", `<button data-v="${pid}" aria-pressed="true">${esc(nome)}</button>`);
+      ["#ntNome", "#ntTel", "#ntMail"].forEach(x => $(x, el).value = ""); toast("Treinador adicionado");
+    } catch (e) {}
+  });
+  $("#qHor", el).addEventListener("change", ev => { if (ev.target.classList.contains("hOn")) ev.target.closest("[data-dia]").querySelector(".hCampos").hidden = !ev.target.checked; });
+  $("#qTrein", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = treinadores.indexOf(b.dataset.v); i >= 0 ? treinadores.splice(i, 1) : treinadores.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
+  $("#qOk", el).addEventListener("click", async () => {
+    const modalidade = $("#qMod", el).value.trim(); if (!modalidade) return toast("Escreva a modalidade");
+    try { await guardar("equipas", id || novoId("e"), { modalidade, escalao: $("#qEsc", el).value.trim(), epoca: e.epoca || epocaVista(), ativa: $("#qAtiva", el).checked, treinos: [...el.querySelectorAll("[data-tdia]")].filter(r => r.querySelector(".tOn").checked).map(r => ({ dia: +r.dataset.tdia, inicio: r.querySelector(".tIni").value.trim(), fim: r.querySelector(".tFim").value.trim(), local: r.querySelector(".tLoc").value.trim() })), ...horarioDoForm(el), responsavel: $("#qResp", el).value || null, treinadores }); fecharFolha(); toast("Equipa guardada"); } catch (err) {}
+  });
+  $("#qDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("equipas", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+}
+
+// ---------- folha ----------
+function abrirFolha(html) {
+  fecharFolha();
+  const bg = document.createElement("div"); bg.className = "sheet-bg"; bg.id = "sheet";
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  bg.addEventListener("click", e => { if (e.target === bg || e.target.closest("[data-close]")) fecharFolha(); });
+  document.body.appendChild(bg);
+  return bg;
+}
+function fecharFolha() { $("#sheet")?.remove(); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") fecharFolha(); });
+document.getElementById("banner").addEventListener("click", e => { if (e.target.id === "sairVista") { vistaComo = null; tab = "hoje"; render(); }
+  if (e.target.id === "epAtual") { epocaSel = null; render(); } });
+
+// ---------- render e eventos ----------
+function render() {
+  const tabs = TABS[nivel()];
+  document.querySelectorAll("nav.tabs button").forEach(b => b.hidden = !tabs.includes(b.dataset.tab));
+  if (!tabs.includes(tab)) tab = tabs[0];
+  renderHeader();
+  const v = { mes: viewMes, temas: viewTemas, relatorio: viewRelatorio, hoje: viewHoje, sessoes: viewSessoes, exercicios: viewExercicios, avaliacoes: viewAvaliacoes, mais: viewMais }[tab];
+  $("#view").innerHTML = v();
+  document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+}
+function irPara(t) { tab = t; try { localStorage.setItem("em_tab", t); } catch (e) {} render(); scrollTo(0, 0); }
+document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) irPara(b.dataset.tab); });
+$("#view").addEventListener("click", e => {
+  const go = e.target.closest("[data-tab-go]"); if (go) return irPara(go.dataset.tabGo);
+  const sbx = e.target.closest("[data-sub]"); if (sbx) { subExe = sbx.dataset.sub; return render(); }
+  const ft = e.target.closest("[data-ftema]"); if (ft) { filtroTema = ft.dataset.ftema; return render(); }
+  const fe = e.target.closest("[data-feq]"); if (fe) { filtroEquipa = fe.dataset.feq; return render(); }
+  const sc = e.target.closest(".scale button");
+  if (sc) {
+    const aid = sc.parentElement.dataset.atleta, n = +sc.dataset.n;
+    guardarAval(d => { d.resultados[aid] = d.resultados[aid] === n ? null : n; });
+    const v = avalPendente.dados.resultados[aid];
+    sc.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === v)));
+    return;
+  }
+  if (e.target.closest("#aTema button")) { avalSel.tema = e.target.closest("button").dataset.v; return render(); }
+  if (e.target.id === "aAdd") {
+    const nomes = $("#aNovos").value.split("\n").map(s => s.trim()).filter(Boolean);
+    (async () => { for (const nome of nomes) { try { await guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }); } catch (err) { break; } } toast(nomes.length + " atleta(s) adicionados"); render(); })();
+    return;
+  }
+  const sb2 = e.target.closest("[data-sem]"); if (sb2) { semOffset += +sb2.dataset.sem; return render(); }
+  if (e.target.closest("#relP button")) { relPeriodo = e.target.closest("button").dataset.v; relOffset = 0; return render(); }
+  const rb = e.target.closest("[data-rel]"); if (rb) { relOffset = Math.min(0, relOffset + +rb.dataset.rel); return render(); }
+  const epb = e.target.closest("[data-ep]"); if (epb) { epocaSel = epb.dataset.ep === epocaDe(hojeISO()) ? null : epb.dataset.ep; avalSel.equipaId = null; filtroEquipa = "todas"; return render(); }
+  if (e.target.id === "epNova") {
+    const b = e.target; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Confirmar: preparar a época " + epocaSeguinte(epocaDe(hojeISO())); return; }
+    (async () => {
+      const de = epocaDe(hojeISO()), para = epocaSeguinte(de), ano = anoEpoca(para);
+      for (const [id, eq] of Object.entries(EQ(de))) {
+        try { await guardar("equipas", id.replace(/-\d{4}$/, "") + "-" + ano, { ...JSON.parse(JSON.stringify(eq)), epoca: para }); } catch (err) { return; }
+      }
+      epocaSel = para; toast("Época " + para + " preparada"); render();
+    })();
+    return;
+  }
+  if (e.target.id === "relImprimir") { window.print(); return; }
+  const tk = e.target.closest("[data-tarefa]");
+  if (tk) { const [rid, i] = tk.dataset.tarefa.split("|"); const r = JSON.parse(JSON.stringify(S.reunioes[rid])); r.tarefas[+i].feito = !r.tarefas[+i].feito; guardar("reunioes", rid, r).then(() => toast(r.tarefas[+i].feito ? "Tarefa concluída" : "Tarefa reaberta"), () => {}); return; }
+  if (e.target.id === "relCopiar") { const t = textoRelatorio(); try { navigator.clipboard.writeText(t).then(() => toast("Relatório copiado"), () => abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`)); } catch (err) { abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`); } return; }
+  if (e.target.id === "entrar") return formLogin();
+  if (e.target.id === "sair") { sb.auth.signOut(); return; }
+  if (e.target.id === "copiarLink") { const u = location.origin + location.pathname; try { navigator.clipboard.writeText(u).then(() => toast("Link copiado"), () => toast(u)); } catch (err) { toast(u); } return; }
+  if (e.target.id === "acAdd") {
+    const email = $("#acEmail").value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("Escreva um email válido");
+    (async () => {
+      const { error } = await sb.from("acessos").upsert({ id: email, papel: $("#acPapel").value, nome: $("#acNome").value.trim() });
+      if (error) return toast("Não foi possível dar acesso: " + erroPT(error));
+      await carregar("acessos"); render(); toast("Acesso dado a " + email);
+    })();
+    return;
+  }
+  const rm = e.target.closest("[data-rmacesso]");
+  if (rm) {
+    if (!rm.dataset.armed) { rm.dataset.armed = 1; rm.textContent = "Confirmar"; return; }
+    (async () => { const { error } = await sb.from("acessos").delete().eq("id", rm.dataset.rmacesso); if (error) return toast("Não foi possível remover"); await carregar("acessos"); render(); })();
+    return;
+  }
+  if (e.target.id === "limparEx") { Object.entries(S.sessoes).filter(([, s]) => s.exemplo).forEach(([id]) => apagar("sessoes", id)); toast("Exemplos apagados"); return; }
+  const a = e.target.closest("[data-act]"); if (!a || a.disabled) return;
+  const id = a.dataset.id;
+  ({
+    atraso: () => abrirAtraso(),
+    planoSessao: () => verPlanoSessao(id, a.dataset.data), verPlano: () => verPlano(id), novoPlano: () => formPlano(),
+    novoMaterial: () => formMaterial(), editMaterial: () => formMaterial(id),
+    verEquipa: () => verEquipa(id),
+    reuniao: () => formReuniao(id),
+    registarPrev: () => { const pv = previstas(a.dataset.data, a.dataset.data).find(x => x.equipaId === id) || {}; formSessao({ equipaId: id, data: a.dataset.data, hora: pv.hora, local: pv.local, duracao: pv.duracao }); },
+    alterar: () => formAlteracao(id, a.dataset.data),
+    registar: () => formSessao(id && S.equipas[id] ? { equipaId: id } : null),
+    verSessao: () => verSessao(id), verExercicio: () => verExercicio(id), novoExercicio: () => formExercicio(),
+    editPlano: () => editPlano(id), editEquipa: () => editEquipa(id), verPessoa: () => verPessoa(id), editPessoa: () => editPessoa(id)
+  })[a.dataset.act]?.();
+});
+$("#view").addEventListener("change", e => {
+  if (e.target.dataset.semana) { const sg = e.target.dataset.semana, v = e.target.value; (v ? guardar("semanas", sg, { planoId: v }) : apagar("semanas", sg)).then(() => toast("Plano da semana guardado"), () => {}); return; }
+  if (e.target.id === "aEq") { avalSel.equipaId = e.target.value; render(); }
+  if (e.target.id === "aMes" && e.target.value) { avalSel.mes = e.target.value; render(); }
+});
+$("#view").addEventListener("input", e => { if (e.target.id === "aObs") { const v = e.target.value; guardarAval(d => { d.obs = v; }); } });
+
+// ---------- dados de demonstração (só quando o db não está disponível) ----------
+function carregarDemo() {
+  demo = true; role = { nivel: "admin", nome: "Coordenação" };
+  if (!window.EM_SIMULACAO) { const sc = document.createElement("script"); sc.src = "simulacao.js"; sc.onload = () => window.EM_SIMULACAO ? carregarDemo() : null; sc.onerror = () => { window.EM_SIMULACAO = "falhou"; carregarDemo(); }; document.head.appendChild(sc); return; }
+  if (typeof window.EM_SIMULACAO === "function") { window.EM_SIMULACAO(S); return render(); }
+  const k = mesKey(new Date()), dow = new Date().getDay();
+  [["Andebol", "Sub-12"], ["Futsal", "Sub-10"], ["Basquetebol", "Sub-12"], ["Voleibol", "Sub-13"], ["Hóquei em patins", "Sub-11"], ["Natação", "Sub-12"]]
+    .forEach(([m, e], i) => S.equipas["e" + i] = { modalidade: m, escalao: e, dias: [((dow + i) % 5) + 1, i < 3 ? dow : 6], hora: "18:" + (i * 10 % 60 + "").padStart(2, "0"), duracao: i % 2 ? 20 : 30, local: "Pavilhão" });
+  S.pessoas.p1 = { nome: "João Cancela", funcao: "Coordenador", telefone: "912 000 000", email: "exemplo@clube.pt" }; S.pessoas.p2 = { nome: "Treinador Exemplo", funcao: "Treinador", telefone: "913 000 000" }; S.equipas.e0.responsavel = "p1"; S.equipas.e0.treinadores = ["p2"];
+  S.exercicios.x1 = { nome: "Saltos ao pé coxinho", tema: "saltar", duracao: 5, descricao: "Saltar num só apoio ao longo de 10 m e trocar de pé." };
+  S.exercicios.x2 = { nome: "Urso (bear crawl)", tema: "gatinhar", duracao: 5, descricao: "Mãos e pés no chão, joelhos a um palmo do solo, avançar 10 m." };
+  S.plano[k] = { tema: "gatinhar", foco: "Exemplo de foco do mês", exercicios: ["x2"] };
+  S.sessoes.s1 = { data: hojeISO(), equipaId: "e0", estado: "dada", nAtletas: 14, correu: 3, tema: "gatinhar", exercicios: ["x2"], resumo: "Exemplo", exemplo: true, criadoEm: 1 };
+  render();
+}
+
+// ---------- login ----------
+function formLogin() {
+  const el = abrirFolha(`<h2>Entrar</h2>
+    <span class="m">Só para a equipa técnica. Pais, treinadores e direção podem ver tudo sem entrar.</span>
+    <div class="field"><label for="lEmail">Email</label><input type="email" id="lEmail" autocomplete="email"></div>
+    <div class="field"><label for="lPass">Password</label><input type="password" id="lPass" autocomplete="current-password"></div>
+    <p class="m" id="lMsg" role="status"></p>
+    <div class="actions"><button class="btn" id="lNova">Criar conta</button><button class="btn primary" id="lOk">Entrar</button></div>
+    <span class="m">Primeira vez? Escreva o email que o coordenador registou, escolha uma password (mínimo 6 caracteres) e toque em Criar conta.</span>`);
+  const msg = t => $("#lMsg", el).textContent = t;
+  const dados = () => ({ email: $("#lEmail", el).value.trim().toLowerCase(), password: $("#lPass", el).value });
+  $("#lOk", el).addEventListener("click", async () => {
+    msg("A entrar…");
+    const { error } = await sb.auth.signInWithPassword(dados());
+    if (error) return msg(/invalid/i.test(error.message) ? "Email ou password errados." : /confirm/i.test(error.message) ? "Conta por confirmar. Fale com o coordenador." : "Não foi possível entrar. Tente outra vez.");
+    fecharFolha(); toast("Entrou");
+  });
+  $("#lNova", el).addEventListener("click", async () => {
+    const d = dados();
+    if (d.password.length < 6) return msg("A password precisa de pelo menos 6 caracteres.");
+    msg("A criar conta…");
+    const { data, error } = await sb.auth.signUp(d);
+    if (error) return msg(/registered|exists/i.test(error.message) ? "Este email já tem conta. Toque em Entrar." : "Não foi possível criar a conta: " + error.message);
+    if (!data.session) return msg("Conta criada, mas precisa de confirmação. Fale com o coordenador.");
+    fecharFolha(); toast("Conta criada");
+  });
+}
+
+// ---------- arranque ----------
+let meuId = null;
+const COLS_PUBLICAS = ["equipas", "exercicios", "plano", "sessoes", "alteracoes", "avaliacoes"];
+const COLS_EQUIPA = ["notas", "atletas", "pessoas", "planos", "material", "planeadas", "semanas"];
+S.acessos = {};
+async function carregar(col) {
+  const out = {};
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await sb.from(col).select("id,data,papel,nome").range(de, de + 999);
+    if (error || !data) break;
+    data.forEach(r => out[r.id] = col === "acessos" ? { papel: r.papel, nome: r.nome } : r.data);
+    if (data.length < 1000) break;
+  }
+  S[col] = out;
+}
+async function definirPapel() {
+  role = { nivel: "view", nome: "Consulta" }; meuId = sessao?.user?.id || null;
+  if (!sessao) return;
+  const { data } = await sb.from("acessos").select("papel").eq("id", sessao.user.email.toLowerCase()).maybeSingle();
+  if (data?.papel === "coordenador") role = { nivel: "admin", nome: "Coordenação" };
+  else if (data?.papel === "preparador") role = { nivel: "write", nome: "Preparação física" };
+}
+async function carregarTudo() {
+  await definirPapel();
+  const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA : []).concat(role.nivel === "admin" ? ["acessos", "reunioes"] : []);
+  COLS_EQUIPA.concat(["acessos", "reunioes"]).forEach(c => { if (!cols.includes(c)) S[c] = {}; });
+  await Promise.all(cols.map(carregar));
+  render();
+}
+try { const t = localStorage.getItem("em_tab"); if (t) tab = t; } catch (e) {}
+document.getElementById("role").addEventListener("click", () => { if (role.nivel === "admin") return escolherVista(); if (!sb) return; if (sessao) irPara("mais"); else formLogin(); });
+render();
+(async () => {
+  const cfg = window.EM_CONFIG || {};
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || !window.supabase) return carregarDemo();
+  sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  sessao = (await sb.auth.getSession()).data.session;
+  await carregarTudo();
+  let ultimo = sessao?.user?.id || null;
+  sb.auth.onAuthStateChange((ev, s2) => {
+    sessao = s2;
+    const id = s2?.user?.id || null;
+    if (id !== ultimo) { ultimo = id; setTimeout(carregarTudo, 0); }
+  });
+  // atualizações em tempo real de outras pessoas
+  sb.channel("alteracoes-bd").on("postgres_changes", { event: "*", schema: "public" }, p => {
+    const col = p.table; if (!(col in S) || col === "acessos") return;
+    if (p.eventType === "DELETE") delete S[col][p.old?.id];
+    else S[col][p.new.id] = p.new.data;
+    agendarRender();
+  }).subscribe();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") carregarTudo(); });
+})();
+</script>
+</body>
+</html>
