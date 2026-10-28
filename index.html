@@ -290,14 +290,20 @@ function agendarRender() {
   renderTimer = setTimeout(() => { if (!document.activeElement?.closest?.("#view textarea, #view input")) render(); else renderHeader(); }, 60);
 }
 function erroPT(error) { return error?.code === "42501" || /row-level security/i.test(error?.message || "") ? "sem permissão" : "verifique a ligação à internet"; }
+function marcar(col, id, data, acao) {
+  const por = sessao?.user?.email?.toLowerCase() || (demo ? "demo@exemplo.pt" : null), em = new Date().toISOString();
+  if (demo && col !== "reunioes") HIST.unshift({ id: Date.now() + Math.random(), em, por, tabela: col, registo: id, acao, antes: S[col][id] ? { data: S[col][id] } : null, depois: data ? { data } : null });
+  return data ? { ...data, _por: por, _em: em } : data;
+}
 async function guardar(col, id, data) {
+  data = marcar(col, id, data, S[col][id] ? "update" : "insert");
   if (demo) { S[col][id] = data; render(); return; }
   const { error } = await sb.from(col).upsert({ id, data });
   if (error) { toast("Não foi possível guardar: " + erroPT(error)); throw error; }
   S[col][id] = data; agendarRender();
 }
 async function apagar(col, id) {
-  if (demo) { delete S[col][id]; render(); return; }
+  if (demo) { marcar(col, id, null, "delete"); delete S[col][id]; render(); return; }
   const { error } = await sb.from(col).delete().eq("id", id);
   if (error) return toast("Não foi possível apagar: " + erroPT(error));
   delete S[col][id]; agendarRender();
@@ -363,7 +369,7 @@ function formAlteracao(equipaId, data) {
   const e = { ...eq, hora: hd.hora, local: hd.local, duracao: hd.duracao };
   let modo = a.cancelada ? "cancelar" : "mudar", motivo = a.motivo || "";
   const el = abrirFolha(`<h2>Alterar sessão</h2>
-    <span class="m">${esc(e.modalidade)} ${esc(e.escalao)} · prevista para ${dataCurta(data)} às ${esc(e.hora || "")}</span>
+    <span class="m">${esc(e.modalidade)} ${esc(e.escalao)} · prevista para ${dataCurta(data)} às ${esc(e.hora || "")}</span>${quemFoi(S.alteracoes[id])}
     <div class="seg" id="aModo"><button data-v="mudar">Mudar dia, hora ou local</button><button data-v="cancelar">Não vai haver</button></div>
     <div id="aMudar" class="row"><div class="field" style="flex:1"><label for="aData">Novo dia</label><input type="date" id="aData" value="${a.novaData || data}"></div>
       <div class="field" style="flex:1"><label for="aHora">Nova hora</label><input type="time" step="300" id="aHora" value="${horaStd(a.novaHora || e.hora)}"></div></div>
@@ -678,7 +684,7 @@ function formSessao(s) {
   if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (temasDe(plS).length) f.temas = temasDe(plS).slice(); }
   let nota = s?.id ? (S.notas[s.id]?.texto || "") : "";
 
-  const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>
+  const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>${novo ? "" : quemFoi(S.sessoes[s.id])}
     <div class="field"><label for="fEq">Equipa</label><select id="fEq">${equipas.map(e => `<option value="${e.id}" ${e.id === f.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
     <div class="field"><label for="fPor">Preparador físico que dá a sessão</label><select id="fPor"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="fData">Data</label><input type="date" id="fData" value="${f.data}"></div>
@@ -1037,7 +1043,7 @@ function viewMais() {
   const k0 = mesKey(new Date());
   const inicio = anoEpoca(epocaVista()); // época de setembro a junho
   const meses = []; for (let i = 0; i < 10; i++) meses.push(mesKey(new Date(inicio, 8 + i, 1)));
-  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + viewGerirTemas() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
+  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + viewGerirTemas() + viewHistorico() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
   meses.forEach(k => {
     const p = S.plano[k];
     html += `<button class="item" data-act="editPlano" data-id="${k}" ${podeGerir() ? "" : "disabled"} style="${k === k0 ? "border-color:var(--accent)" : ""}">
@@ -1121,6 +1127,54 @@ function viewGerirTemas() {
     <span class="m">Os quatro temas base ficam sempre. Pode criar outros (ex.: Geral) e escolher mais do que um tema por mês, plano ou sessão.</span>
     <div class="item">${Object.keys(TEMAS).map(t => `<div class="row">${chipTema(t)}${TEMAS_BASE[t] ? `<span class="m">base</span>` : `<button class="btn ghost" data-rmtema="${t}">Apagar</button>`}</div>`).join("")}
       <div class="row"><input type="text" id="novoTema" placeholder="Novo tema (ex.: Geral)" aria-label="Nome do novo tema" style="flex:1;min-width:0"><button class="btn primary" id="addTema">Adicionar</button></div></div></section>`;
+}
+let HIST = [], histN = 30, histPor = "todos";
+async function carregarHistorico() {
+  if (demo || role.nivel !== "admin") return;
+  const { data, error } = await sb.from("historico").select("*").order("em", { ascending: false }).limit(500);
+  if (!error) HIST = data || [];
+}
+function nomeDeEmail(em) {
+  if (!em) return "Sistema";
+  return S.acessos?.[em]?.nome || Object.values(S.pessoas).find(p => (p.email || "").toLowerCase() === em)?.nome || em.split("@")[0];
+}
+function horaDe(ts) { const d = new Date(ts); return dataCurta(isoDe(d)) + " às " + d.toTimeString().slice(0, 5); }
+function quemFoi(x) { return x?._por ? `<span class="m">Última alteração: ${esc(nomeDeEmail(x._por))}, ${horaDe(x._em)}</span>` : ""; }
+const TAB_NOME = { sessoes: "a sessão", equipas: "o escalão", pessoas: "a pessoa", avaliacoes: "a avaliação", atletas: "o atleta", notas: "a nota da sessão", exercicios: "o exercício", plano: "o plano anual", planos: "o plano de sessão", material: "o material", planeadas: "o planeamento", semanas: "o planeamento", acessos: "o acesso", reunioes: "a reunião" };
+const CAMPO_NOME = { hora: "hora", local: "local", duracao: "duração", nAtletas: "nº de atletas", estado: "se foi dada", motivo: "motivo", resumo: "resumo", correu: "como correu", itens: "exercícios", exercicios: "exercícios", horario: "horário fixo", treinos: "treinos", responsavel: "PF", preparador: "PF", treinadores: "treinadores", novaData: "dia", novaHora: "hora", novoLocal: "local", novaDuracao: "duração", cancelada: "cancelamento", temas: "temas", tema: "temas", nome: "nome", telefone: "telefone", email: "email", funcao: "função", modalidade: "modalidade", escalao: "escalão", data: "data", texto: "texto", papel: "papel", foco: "foco", ativa: "ativo/inativo" };
+function descHist(h) {
+  const d = h.depois?.data || h.antes?.data || {}, t = h.tabela;
+  let alvo = "";
+  if (d.equipaId && S.equipas[d.equipaId]) alvo = equipaNome(d.equipaId) + (d.data ? " · " + dataCurta(d.data) : "");
+  else if (t === "equipas") alvo = ((d.modalidade || "") + " " + (d.escalao || "")).trim();
+  else if (t === "acessos") alvo = h.registo + " (" + ((h.depois || h.antes)?.papel || "") + ")";
+  else if (t === "plano" && /^\d{4}-\d{2}$/.test(h.registo)) alvo = mesNome(h.registo);
+  else alvo = d.nome || d.texto?.slice(0, 40) || "";
+  const verbo = t === "alteracoes" ? (h.acao === "delete" ? "repôs o horário normal" : "mudou o horário") : ({ insert: "registou", update: "alterou", delete: "apagou" }[h.acao] || h.acao) + " " + (TAB_NOME[t] || t);
+  let mud = "";
+  if (h.acao === "update" && h.antes?.data && h.depois?.data) {
+    const a = h.antes.data, b = h.depois.data;
+    const ks = [...new Set(Object.keys(a).concat(Object.keys(b)))].filter(k => k[0] !== "_" && JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+    mud = [...new Set(ks.map(k => CAMPO_NOME[k] || k))].join(", ");
+  }
+  return { verbo, alvo, mud };
+}
+function viewHistorico() {
+  if (!podeGerir()) return "";
+  const quem = [...new Set(HIST.map(h => h.por || ""))];
+  if (histPor !== "todos" && !quem.includes(histPor)) histPor = "todos";
+  const lista = HIST.filter(h => histPor === "todos" || (h.por || "") === histPor);
+  let html = `<section><div class="sec-h"><h2>Histórico</h2><span class="sub">quem registou ou alterou</span></div>`;
+  if (quem.length > 1) html += `<div class="filters" id="histPor"><button data-v="todos" aria-pressed="${histPor === "todos"}">Todos</button>${quem.map(e => `<button data-v="${esc(e)}" aria-pressed="${histPor === e}">${esc(nomeDeEmail(e))}</button>`).join("")}</div>`;
+  html += `<div class="list">`;
+  lista.slice(0, histN).forEach(h => {
+    const x = descHist(h);
+    html += `<div class="item"><div class="row"><span><b>${esc(nomeDeEmail(h.por))}</b> ${x.verbo}</span><span class="m" style="flex:none">${horaDe(h.em)}</span></div>
+      ${x.alvo ? `<span class="m">${esc(x.alvo)}</span>` : ""}${x.mud ? `<span class="m">Mudou: ${esc(x.mud)}</span>` : ""}</div>`;
+  });
+  if (!lista.length) html += `<div class="empty">${demo ? "Ainda não há alterações." : "Ainda não há alterações registadas. O histórico começa a contar a partir de agora."}</div>`;
+  if (lista.length > histN) html += `<button class="btn" id="histMais">Ver mais</button>`;
+  return html + `</div></section>`;
 }
 let semOffset = 0, semPF = "todos";
 // Cores fixas por modalidade (as restantes vêm da paleta pela ordem)
@@ -1408,6 +1462,8 @@ $("#view").addEventListener("click", e => {
     return;
   }
   const sb2 = e.target.closest("[data-sem]"); if (sb2) { semOffset += +sb2.dataset.sem; return render(); }
+  if (e.target.closest("#histPor button")) { histPor = e.target.closest("button").dataset.v; histN = 30; return render(); }
+  if (e.target.id === "histMais") { histN += 30; return render(); }
   if (e.target.closest("#semPF button")) { semPF = e.target.closest("button").dataset.v; return render(); }
   if (e.target.closest("#relP button")) { relPeriodo = e.target.closest("button").dataset.v; relOffset = 0; return render(); }
   const rb = e.target.closest("[data-rel]"); if (rb) { relOffset = Math.min(0, relOffset + +rb.dataset.rel); return render(); }
@@ -1554,7 +1610,7 @@ async function carregarTudo() {
   await definirPapel();
   const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA : []).concat(role.nivel === "admin" ? ["acessos", "reunioes"] : []);
   COLS_EQUIPA.concat(["acessos", "reunioes"]).forEach(c => { if (!cols.includes(c)) S[c] = {}; });
-  await Promise.all(cols.map(carregar));
+  await Promise.all(cols.map(carregar).concat(carregarHistorico()));
   render();
 }
 try { const t = localStorage.getItem("em_tab"); if (t) tab = t; } catch (e) {}
@@ -1574,6 +1630,7 @@ render();
   });
   // atualizações em tempo real de outras pessoas
   sb.channel("alteracoes-bd").on("postgres_changes", { event: "*", schema: "public" }, p => {
+    if (p.table === "historico") { if (p.new && !HIST.some(h => h.id === p.new.id)) HIST.unshift(p.new); return agendarRender(); }
     const col = p.table; if (!(col in S) || col === "acessos") return;
     if (p.eventType === "DELETE") delete S[col][p.old?.id];
     else S[col][p.new.id] = p.new.data;
