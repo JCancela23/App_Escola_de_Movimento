@@ -266,16 +266,18 @@ const temasDoMes = k => temasDe(S.plano[k]);
 function chipTema(t) { return [].concat(t || []).filter(x => TEMAS[x]).map(x => `<span class="chip" style="color:${corTema(x)}"><span class="dot"></span>${esc(nomeTema(x))}</span>`).join(" "); }
 // Três maneiras de usar: coordenação (tudo), preparador físico (regista) e consulta (pais, treinadores, direção)
 let vistaComo = null; // a coordenação pode pré-visualizar as outras maneiras
-const VISTAS = { admin: "Coordenação", write: "Preparador físico", view: "Pais, treinadores e direção" };
-const nivel = () => role.nivel === "admin" && vistaComo ? vistaComo : role.nivel;
+// Administrador (só o João): também Acessos, Reuniões, Relatórios e Histórico
+const VISTAS = { dono: "Administrador", admin: "Coordenação", write: "Preparador físico", view: "Pais, treinadores e direção" };
+const nivel = () => role.nivel === "dono" && vistaComo ? vistaComo : role.nivel;
 const podeEscrever = () => nivel() !== "view";
-const podeGerir = () => nivel() === "admin";
-const TABS = { admin: ["hoje", "sessoes", "exercicios", "avaliacoes", "relatorio", "mais"], write: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], view: ["mes", "temas", "exercicios", "avaliacoes"] };
+const podeGerir = () => nivel() === "admin" || nivel() === "dono";
+const eDono = () => nivel() === "dono";
+const TABS = { dono: ["hoje", "sessoes", "exercicios", "avaliacoes", "relatorio", "mais"], admin: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], write: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], view: ["mes", "temas", "exercicios", "avaliacoes"] };
 function escolherVista() {
   const el = abrirFolha(`<h2>Ver a app como</h2><span class="m">Para confirmar o que cada pessoa vê. Nada muda nos dados.</span>
     <div class="list">${Object.entries(VISTAS).map(([k, t]) => `<button class="item" data-vista="${k}"><div class="row"><span class="t">${t}</span>${nivel() === k ? `<span class="chip ok">atual</span>` : ""}</div></button>`).join("")}</div>
     <div class="actions"><button class="btn" data-close>Fechar</button></div>`);
-  el.addEventListener("click", ev => { const b = ev.target.closest("[data-vista]"); if (!b) return; vistaComo = b.dataset.vista === "admin" ? null : b.dataset.vista; fecharFolha(); tab = TABS[nivel()][0]; render(); scrollTo(0, 0); });
+  el.addEventListener("click", ev => { const b = ev.target.closest("[data-vista]"); if (!b) return; vistaComo = b.dataset.vista === "dono" ? null : b.dataset.vista; fecharFolha(); tab = TABS[nivel()][0]; render(); scrollTo(0, 0); });
 }
 
 function toast(msg) {
@@ -319,7 +321,7 @@ function renderHeader() {
   h.style.color = tm.length ? corTema(tm[0]) : "";
   $("#heroMes").textContent = (tm.length > 1 ? "temas de " : "tema de ") + mesNome(k);
   $("#heroFoco").textContent = p?.foco || (podeGerir() ? "Defina o tema do mês em Mais › Plano anual." : "");
-  $("#role").textContent = vistaComo ? "A ver como: " + { write: "PF", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
+  $("#role").textContent = vistaComo ? "A ver como: " + { admin: "Coord.", write: "PF", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
   const avisoEp = epocaSel ? `<div class="banner">Está a ver a época <b>${epocaSel}</b>. <button class="btn" id="epAtual">Voltar à época atual</button></div>` : "";
   $("#banner").innerHTML = avisoEp + (vistaComo ? `<div class="banner">Está a ver a app como <b>${VISTAS[vistaComo]}</b>. <button class="btn" id="sairVista">Voltar à coordenação</button></div>` : demo ? `<div class="banner">${window.EM_SIM_TEXTO || "Modo demonstração: a app ainda não está ligada à base de dados."}</div>` : !sessao ? `<div class="banner">Está a ver em modo de consulta. Equipa técnica: toque em <b>Entrar</b>.</div>` : "");
 }
@@ -528,7 +530,7 @@ function viewRelatorio() {
   if (podeEscrever() && R.dadas.length) html += `<section><div class="sec-h"><h2>Quem deu as sessões</h2></div><div class="item">${barras(R.porPessoa, "var(--accent)", R.dadas.length)}</div></section>`;
   if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div></section>`;
   if (R.porReg.length && podeEscrever()) html += `<section><div class="sec-h"><h2>Por registar</h2></div><div class="list">${R.porReg.map(p => `<div class="item"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}" style="justify-self:start">Registar</button></div>`).join("")}</div></section>`;
-  if (podeGerir()) {
+  if (eDono()) {
     const feitas = R.tarefas.filter(t => t.feito).length;
     html += `<section><div class="sec-h"><h2>Reuniões</h2><span class="sub">${R.reun.length} no período</span></div><div class="list">`;
     if (R.tarefas.length) html += `<div class="item"><div class="row"><span class="m">Tarefas concluídas</span><span class="t">${feitas} de ${R.tarefas.length}</span></div><div class="bar"><i style="width:${feitas / R.tarefas.length * 100}%;background:var(--ok)"></i></div></div>`;
@@ -583,9 +585,9 @@ function viewHoje() {
   if (!prox.length) html += `<div class="empty">Sem sessões previstas.</div>`;
   html += `</div></section>`;
 
-  if (podeGerir()) { const ab = tarefasAbertas(); if (ab.length) html += `<section><div class="sec-h"><h2>Tarefas por fazer</h2><span class="sub">${ab.length}</span></div><div class="list">${ab.slice(0, 5).map(itemTarefa).join("")}</div></section>`; }
+  if (eDono()) { const ab = tarefasAbertas(); if (ab.length) html += `<section><div class="sec-h"><h2>Tarefas por fazer</h2><span class="sub">${ab.length}</span></div><div class="list">${ab.slice(0, 5).map(itemTarefa).join("")}</div></section>`; }
 
-  if (!podeGerir()) return html;
+  if (!eDono()) return html;
   html += `<section><div class="sec-h"><h2>Resumo de ${MESES[new Date().getMonth()]}</h2></div>
     <div class="stats">
       <div class="stat"><b class="ok">${dadas.length}</b><span>Dadas</span></div>
@@ -1070,16 +1072,16 @@ function viewMais() {
   const acessos = sorted(S.acessos, (a, b) => a.id.localeCompare(b.id));
   html += `<section><div class="sec-h"><h2>Acessos</h2></div>
     <div class="item"><span class="t">${sessao ? esc(sessao.user.email) + " · " + role.nome : "Modo de consulta"}</span>
-      <span class="m">${role.nivel === "admin" ? "Pode editar tudo e gerir os acessos." : role.nivel === "write" ? "Pode registar sessões, notas internas e avaliações, e ajustar horários." : "Pode ver o plano, os exercícios, o horário e o resumo das sessões. Contactos, notas internas e avaliações individuais só aparecem à equipa técnica."}</span>
+      <span class="m">${role.nivel === "dono" ? "Pode editar tudo e gerir os acessos, as reuniões, os relatórios e o histórico." : role.nivel === "admin" ? "Pode editar tudo, exceto acessos, reuniões, relatórios e histórico." : role.nivel === "write" ? "Pode registar sessões, notas internas e avaliações, e ajustar horários." : "Pode ver o plano, os exercícios, o horário e o resumo das sessões. Contactos, notas internas e avaliações individuais só aparecem à equipa técnica."}</span>
       ${sessao && role.nivel === "view" ? `<span class="m">Se é da equipa técnica, peça ao coordenador para adicionar o seu email.</span>` : ""}
       <div class="actions" style="justify-content:flex-start">${sessao ? `<button class="btn" id="sair">Sair</button>` : `<button class="btn primary" id="entrar">Entrar</button>`}<button class="btn" id="copiarLink">Copiar link para pais e treinadores</button></div></div>`;
-  if (podeGerir()) {
+  if (eDono()) {
     html += `<div class="item"><span class="t">Equipa técnica com acesso</span>
       <span class="m">Adicione o email da pessoa e o papel. Ela entra em Entrar › Criar conta com esse email. Pais, treinadores e direção não precisam de conta: basta o link.</span>
-      ${acessos.map(a => `<div class="row"><span>${esc(a.nome || a.id)}<br><span class="m">${esc(a.id)} · ${a.papel === "coordenador" ? "Coordenação" : "Preparação física"}</span></span>${a.id !== sessao?.user.email?.toLowerCase() ? `<button class="btn danger" data-rmacesso="${esc(a.id)}">Remover</button>` : ""}</div>`).join("")}
+      ${acessos.map(a => `<div class="row"><span>${esc(a.nome || a.id)}<br><span class="m">${esc(a.id)} · ${{ administrador: "Administrador", coordenador: "Coordenação" }[a.papel] || "Preparação física"}</span></span>${a.id !== sessao?.user.email?.toLowerCase() ? `<button class="btn danger" data-rmacesso="${esc(a.id)}">Remover</button>` : ""}</div>`).join("")}
       <div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" placeholder="nome@exemplo.pt"></div>
       <div class="field"><label for="acNome">Nome</label><input type="text" id="acNome"></div>
-      <div class="field"><label for="acPapel">Papel</label><select id="acPapel"><option value="preparador">Preparação física (regista e ajusta horários)</option><option value="coordenador">Coordenação (acesso total)</option></select></div>
+      <div class="field"><label for="acPapel">Papel</label><select id="acPapel"><option value="preparador">Preparação física (regista e ajusta horários)</option><option value="coordenador">Coordenação (tudo, exceto acessos, reuniões, relatórios e histórico)</option></select></div>
       <button class="btn primary" id="acAdd">Dar acesso</button></div>`;
     if (Object.values(S.sessoes).some(s => s.exemplo)) html += `<button class="btn danger" id="limparEx">Apagar sessões de exemplo</button>`;
   }
@@ -1130,7 +1132,7 @@ function viewGerirTemas() {
 }
 let HIST = [], histN = 30, histPor = "todos";
 async function carregarHistorico() {
-  if (demo || role.nivel !== "admin") return;
+  if (demo || role.nivel !== "dono") return;
   const { data, error } = await sb.from("historico").select("*").order("em", { ascending: false }).limit(500);
   if (!error) HIST = data || [];
 }
@@ -1160,7 +1162,7 @@ function descHist(h) {
   return { verbo, alvo, mud };
 }
 function viewHistorico() {
-  if (!podeGerir()) return "";
+  if (!eDono()) return "";
   const quem = [...new Set(HIST.map(h => h.por || ""))];
   if (histPor !== "todos" && !quem.includes(histPor)) histPor = "todos";
   const lista = HIST.filter(h => histPor === "todos" || (h.por || "") === histPor);
@@ -1241,7 +1243,7 @@ function viewEpocas() {
   return html + `</section>`;
 }
 function viewReunioes() {
-  if (!podeGerir()) return "";
+  if (!eDono()) return "";
   const lista = sorted(S.reunioes, (a, b) => b.data.localeCompare(a.data) || (b.hora || "").localeCompare(a.hora || ""));
   const abertas = tarefasAbertas();
   let html = `<section><div class="sec-h"><h2>Reuniões</h2><span class="sub">${lista.length}</span></div>
@@ -1541,7 +1543,7 @@ $("#view").addEventListener("input", e => { if (e.target.id === "aObs") { const 
 
 // ---------- dados de demonstração (só quando o db não está disponível) ----------
 function carregarDemo() {
-  demo = true; role = { nivel: "admin", nome: "Coordenação" };
+  demo = true; role = { nivel: "dono", nome: "Administrador" };
   if (!window.EM_SIMULACAO) { const sc = document.createElement("script"); sc.src = "simulacao.js"; sc.onload = () => window.EM_SIMULACAO ? carregarDemo() : null; sc.onerror = () => { window.EM_SIMULACAO = "falhou"; carregarDemo(); }; document.head.appendChild(sc); return; }
   if (typeof window.EM_SIMULACAO === "function") { window.EM_SIMULACAO(S); return render(); }
   const k = mesKey(new Date()), dow = new Date().getDay();
@@ -1603,18 +1605,19 @@ async function definirPapel() {
   role = { nivel: "view", nome: "Consulta" }; meuId = sessao?.user?.id || null;
   if (!sessao) return;
   const { data } = await sb.from("acessos").select("papel").eq("id", sessao.user.email.toLowerCase()).maybeSingle();
-  if (data?.papel === "coordenador") role = { nivel: "admin", nome: "Coordenação" };
+  if (data?.papel === "administrador") role = { nivel: "dono", nome: "Administrador" };
+  else if (data?.papel === "coordenador") role = { nivel: "admin", nome: "Coordenação" };
   else if (data?.papel === "preparador") role = { nivel: "write", nome: "Preparação física" };
 }
 async function carregarTudo() {
   await definirPapel();
-  const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA : []).concat(role.nivel === "admin" ? ["acessos", "reunioes"] : []);
+  const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA : []).concat(role.nivel === "dono" ? ["acessos", "reunioes"] : []);
   COLS_EQUIPA.concat(["acessos", "reunioes"]).forEach(c => { if (!cols.includes(c)) S[c] = {}; });
   await Promise.all(cols.map(carregar).concat(carregarHistorico()));
   render();
 }
 try { const t = localStorage.getItem("em_tab"); if (t) tab = t; } catch (e) {}
-document.getElementById("role").addEventListener("click", () => { if (role.nivel === "admin") return escolherVista(); if (!sb) return; if (sessao) irPara("mais"); else formLogin(); });
+document.getElementById("role").addEventListener("click", () => { if (role.nivel === "dono") return escolherVista(); if (!sb) return; if (sessao) irPara("mais"); else formLogin(); });
 render();
 (async () => {
   const cfg = window.EM_CONFIG || {};
