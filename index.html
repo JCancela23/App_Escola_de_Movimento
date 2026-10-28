@@ -353,7 +353,7 @@ function previstas(de, ate) {
 function sessaoDe(p) { return Object.entries(S.sessoes).map(([id, v]) => ({ id, ...v })).find(s => s.equipaId === p.equipaId && s.data === p.data); }
 function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
-  const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Dada · ${s.nAtletas}</span>` : `<span class="chip bad">Não dada</span>`)
+  const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Realizada · ${s.nAtletas}</span>` : `<span class="chip bad">Não realizada</span>`)
     : p.cancelada ? `<span class="chip bad">Cancelada</span>` : p.data <= hojeISO() ? `<span class="chip warn">Por registar</span>` : "";
   const quem = s?._por ? " · registada por " + esc(nomeDeEmail(s._por).split(" ")[0]) : "";
   const porque = s?.estado === "nao_dada" ? `<span class="m bad">Porquê: ${esc(s.motivo || "sem motivo indicado")}</span>` : "";
@@ -423,7 +423,7 @@ function abrirAtraso() {
     : `<span class="m">O coordenador ainda não indicou a data de início da época.</span>`;
   else if (!lista.length) html += `<div class="empty">Está tudo registado desde ${dataCurta(inicioEpoca())}.</div>`;
   else {
-    html += `<span class="m">${lista.length} sessão(ões) do horário desde ${dataCurta(inicioEpoca())} sem registo. Toque numa para registar como dada ou não dada. Sessões fora do horário registam-se em Registar sessão.</span><div class="list">`;
+    html += `<span class="m">${lista.length} sessão(ões) do horário desde ${dataCurta(inicioEpoca())} sem registo. Toque numa para registar como realizada ou não realizada. Sessões fora do horário registam-se em Registar sessão.</span><div class="list">`;
     let sem = "";
     lista.slice().reverse().forEach(p => {
       const d = new Date(p.data + "T12:00"), seg = somaDias(p.data, -((d.getDay() + 6) % 7));
@@ -514,18 +514,18 @@ function viewRelatorio() {
     <div class="seg" id="relP"><button data-v="semana" aria-pressed="${relPeriodo === "semana"}">Semanal</button><button data-v="mes" aria-pressed="${relPeriodo === "mes"}">Mensal</button><button data-v="epoca" aria-pressed="${relPeriodo === "epoca"}">Toda a época</button></div>
     ${relPeriodo === "epoca" ? `<div class="row"><span class="t">${R.P.nome}</span></div>` : `<div class="row"><button class="btn" data-rel="-1" aria-label="Período anterior">‹</button><span class="t">${R.P.nome}</span><button class="btn" data-rel="1" aria-label="Período seguinte" ${relOffset >= 0 ? "disabled" : ""}>›</button></div>`}
     <div class="stats">
-      <div class="stat"><b class="ok">${R.dadas.length}</b><span>Dadas</span></div>
-      <div class="stat"><b class="bad">${R.nao.length}</b><span>Não dadas</span></div>
+      <div class="stat"><b class="ok">${R.dadas.length}</b><span>Realizadas</span></div>
+      <div class="stat"><b class="bad">${R.nao.length}</b><span>Não realizadas</span></div>
       <div class="stat"><b>${pct}%</b><span>Cumprimento</span></div>
       <div class="stat"><b>${R.atletas}</b><span>Presenças</span></div>
     </div>
-    ${R.ferias.length ? `<span class="m">${R.ferias.length} sessão(ões) sem efeito por férias ou feriados (não contam como não dadas).</span>` : ""}
+    ${R.ferias.length ? `<span class="m">${R.ferias.length} sessão(ões) sem efeito por férias ou feriados (não contam como não realizadas).</span>` : ""}
     ${R.porReg.length ? `<div class="banner">${R.porReg.length} sessão(ões) prevista(s) ainda sem registo.</div>` : ""}
   </section>`;
   html += `<section><div class="sec-h"><h2>Onde está implementada</h2></div><div class="item"><span class="t">${R.modalidadesAbr.length} modalidades · ${R.escaloes} escalões</span><span class="m">${R.modalidadesAbr.map(esc).join(", ")}</span></div></section>`;
-  if (Object.keys(R.temas).length) html += `<section><div class="sec-h"><h2>Temas trabalhados</h2><span class="sub">sessões dadas</span></div><div class="item">${barras(R.temas, "var(--accent)", R.dadas.length)}</div></section>`;
+  if (Object.keys(R.temas).length) html += `<section><div class="sec-h"><h2>Temas trabalhados</h2><span class="sub">sessões realizadas</span></div><div class="item">${barras(R.temas, "var(--accent)", R.dadas.length)}</div></section>`;
   if (Object.keys(R.aval).length) html += `<section><div class="sec-h"><h2>Avaliações</h2><span class="sub">média de 1 a 4</span></div><div class="item">${Object.entries(R.aval).map(([t, x]) => `<div class="row"><span class="m">${esc(t)} (${x.n} avaliações)</span><span class="t">${(x.soma / x.n).toFixed(1)}</span></div>`).join("")}</div></section>`;
-  html += `<section><div class="sec-h"><h2>Por modalidade</h2></div><div class="item" style="overflow-x:auto"><table class="tab"><thead><tr><th>Modalidade</th><th>Dadas</th><th>Não</th><th>Média atl.</th></tr></thead><tbody>`;
+  html += `<section><div class="sec-h"><h2>Por modalidade</h2></div><div class="item" style="overflow-x:auto"><table class="tab"><thead><tr><th>Modalidade</th><th>Realizadas</th><th>Não</th><th>Média atl.</th></tr></thead><tbody>`;
   Object.entries(R.porMod).sort().forEach(([k, m]) => html += `<tr><td>${esc(k)}</td><td class="ok">${m.dadas}</td><td class="bad">${m.nao}</td><td>${m.dadas ? Math.round(m.atletas / m.dadas) : "–"}</td></tr>`);
   if (!Object.keys(R.porMod).length) html += `<tr><td colspan="4" class="m">Sem sessões neste período.</td></tr>`;
   html += `</tbody></table></div></section>`;
@@ -547,19 +547,19 @@ function textoRelatorio() {
   const R = calcRelatorio(), L = [];
   L.push(`Escola do Movimento · Relatório ${relPeriodo === "mes" ? "mensal" : relPeriodo === "epoca" ? "da época" : "semanal"} (${R.P.nome})`, "");
   L.push(`Implementada em ${R.modalidadesAbr.length} modalidades e ${R.escaloes} escalões: ${R.modalidadesAbr.join(", ")}`, "");
-  L.push(`Sessões dadas: ${R.dadas.length}`, `Sessões não dadas: ${R.nao.length}`, `Presenças de atletas: ${R.atletas}`);
+  L.push(`Sessões realizadas: ${R.dadas.length}`, `Sessões não realizadas: ${R.nao.length}`, `Presenças de atletas: ${R.atletas}`);
   if (R.ferias.length) L.push(`Sem efeito por férias ou feriados: ${R.ferias.length}`);
   if (R.porReg.length) L.push(`Ainda por registar: ${R.porReg.length}`);
   L.push("", "Por modalidade:");
-  Object.entries(R.porMod).sort().forEach(([k, m]) => L.push(`• ${k}: ${m.dadas} dadas, ${m.nao} não dadas${m.dadas ? `, média ${Math.round(m.atletas / m.dadas)} atletas` : ""}`));
+  Object.entries(R.porMod).sort().forEach(([k, m]) => L.push(`• ${k}: ${m.dadas} realizadas, ${m.nao} não realizadas${m.dadas ? `, média ${Math.round(m.atletas / m.dadas)} atletas` : ""}`));
   if (podeEscrever() && R.dadas.length) { L.push("", "Quem deu:"); Object.entries(R.porPessoa).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
-  if (Object.keys(R.temas).length) { L.push("", "Temas trabalhados (sessões dadas):"); Object.entries(R.temas).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  if (Object.keys(R.temas).length) { L.push("", "Temas trabalhados (sessões realizadas):"); Object.entries(R.temas).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
   if (Object.keys(R.aval).length) { L.push("", "Avaliações (média de 1 a 4):"); Object.entries(R.aval).forEach(([t, x]) => L.push(`• ${t}: ${(x.soma / x.n).toFixed(1)} (${x.n} avaliações)`)); }
   if (podeGerir() && R.reun.length) {
     L.push("", `Reuniões: ${R.reun.length}` + (R.tarefas.length ? ` · tarefas concluídas ${R.tarefas.filter(t => t.feito).length} de ${R.tarefas.length}` : ""));
     R.reun.forEach(r => L.push(`• ${dataCurta(r.data)} (${r.tipo === "online" ? "online" : "presencial"})${r.objetivos ? ": " + r.objetivos.replace(/\s+/g, " ") : ""}`));
   }
-  if (R.nao.length) { L.push("", "Motivos das não dadas:"); Object.entries(R.motivos).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  if (R.nao.length) { L.push("", "Motivos das não realizadas:"); Object.entries(R.motivos).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
   return L.join("\n");
 }
 
@@ -585,7 +585,7 @@ function viewHoje() {
   const n = k => est.filter(e => e === k).length;
   let html = `<section><div class="sec-h"><h2>${hojeOffset === 0 ? "Esta semana" : hojeOffset === -1 ? "Semana passada" : hojeOffset === 1 ? "Próxima semana" : "Semana"}</h2><span class="sub">${dataCurta(seg).slice(4)} a ${dataCurta(dom).slice(4)}</span></div>
     <div class="row"><button class="btn" data-hsem="-1" aria-label="Semana anterior">‹ Anterior</button>${hojeOffset ? `<button class="btn ghost" data-hsem="0">Esta semana</button>` : ""}<button class="btn" data-hsem="1" aria-label="Semana seguinte">Seguinte ›</button></div>
-    <div class="stats"><div class="stat"><b class="ok">${n("dada")}</b><span>Dadas</span></div><div class="stat"><b class="bad">${n("nao_dada")}</b><span>Não dadas</span></div><div class="stat"><b class="warn">${n("porReg")}</b><span>Por registar</span></div><div class="stat"><b>${n("prevista")}</b><span>Por dar</span></div></div>
+    <div class="stats"><div class="stat"><b class="ok">${n("dada")}</b><span>Realizadas</span></div><div class="stat"><b class="bad">${n("nao_dada")}</b><span>Não realizadas</span></div><div class="stat"><b class="warn">${n("porReg")}</b><span>Por registar</span></div><div class="stat"><b>${n("prevista")}</b><span>Por dar</span></div></div>
     <div class="list">`;
   let dia = "";
   prev.forEach(p => { if (p.data !== dia) { dia = p.data; html += `<div class="lbl" style="margin-top:6px;${p.data === hoje ? "color:var(--accent)" : ""}">${dataCurta(p.data)}${p.data === hoje ? " · hoje" : ""}</div>`; } html += itemPrevista(p); });
@@ -599,13 +599,13 @@ function viewHoje() {
   if (!eDono()) return html;
   html += `<section><div class="sec-h"><h2>Resumo de ${MESES[new Date().getMonth()]}</h2></div>
     <div class="stats">
-      <div class="stat"><b class="ok">${dadas.length}</b><span>Dadas</span></div>
-      <div class="stat"><b class="bad">${nao.length}</b><span>Não dadas</span></div>
+      <div class="stat"><b class="ok">${dadas.length}</b><span>Realizadas</span></div>
+      <div class="stat"><b class="bad">${nao.length}</b><span>Não realizadas</span></div>
       <div class="stat"><b>${pct}%</b><span>Cumprimento</span></div>
       <div class="stat"><b>${media}</b><span>Atletas/sessão</span></div>
     </div>`;
   if (nao.length) {
-    html += `<div class="item"><span class="lbl">Motivos de sessões não dadas</span>`;
+    html += `<div class="item"><span class="lbl">Motivos de sessões não realizadas</span>`;
     Object.entries(motivos).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => {
       html += `<div class="row"><span class="m">${esc(m)}</span><span class="t">${n}</span></div><div class="bar"><i style="width:${n / nao.length * 100}%;background:var(--bad)"></i></div>`;
     });
@@ -635,12 +635,12 @@ function viewTemas() {
   const abordados = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada") temasDe(s).filter(t => TEMAS[t]).forEach(t => abordados[nomeTema(t)] = (abordados[nomeTema(t)] || 0) + 1); });
   const total = Object.values(abordados).reduce((a, b) => a + b, 0);
   let html = "";
-  if (total) html += `<section><div class="sec-h"><h2>Temas já abordados</h2><span class="sub">${total} sessões dadas</span></div><div class="item">${barras(abordados, "var(--accent)", total)}</div></section>`;
+  if (total) html += `<section><div class="sec-h"><h2>Temas já abordados</h2><span class="sub">${total} sessões realizadas</span></div><div class="item">${barras(abordados, "var(--accent)", total)}</div></section>`;
   html += `<section><div class="sec-h"><h2>Planeamento da época</h2><span class="sub">${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="list">`;
   for (let i = 0; i < 10; i++) {
     const k = mesKey(new Date(inicio, 8 + i, 1)), p = S.plano[k], estado = k < k0 ? "Abordado" : k === k0 ? "Em curso" : "Previsto";
     html += `<div class="item" style="${k === k0 ? "border-color:var(--accent)" : ""}"><div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(temasDe(p)) : `<span class="m">Por definir</span>`}</div>
-      <span class="m">${estado}${dadasPorMes[k] ? " · " + dadasPorMes[k] + " sessões dadas" : ""}${p?.foco ? " · " + esc(p.foco) : ""}</span></div>`;
+      <span class="m">${estado}${dadasPorMes[k] ? " · " + dadasPorMes[k] + " sessões realizadas" : ""}${p?.foco ? " · " + esc(p.foco) : ""}</span></div>`;
   }
   return html + `</div></section>`;
 }
@@ -672,7 +672,7 @@ function viewSessoes() {
 function itemSessao(s) {
   const estado = s.estado === "dada"
     ? `<span class="chip ok">${s.nAtletas} atletas</span>`
-    : `<span class="chip bad">Não dada</span>`;
+    : `<span class="chip bad">Não realizada</span>`;
   const linha = s.estado === "dada" ? (CORREU.find(c => c.v === s.correu)?.t || "") + (s.resumo ? " · " + esc(s.resumo) : "") : esc(s.motivo || "");
   return `<button class="item" data-act="verSessao" data-id="${s.id}">
     <div class="row"><span class="t">${esc(equipaNome(s.equipaId))}</span>${estado}</div>
@@ -702,7 +702,7 @@ function formSessao(s) {
     <div class="row"><div class="field" style="flex:1"><label for="fHora">Hora</label><input type="time" step="300" id="fHora" value="${horaStd(f.hora)}"></div>
       <div class="field" style="flex:1"><label for="fDur">Duração (min)</label><input type="number" id="fDur" value="${f.duracao}"></div></div>
     <div class="field"><label for="fLocal">Local</label><input type="text" id="fLocal" value="${esc(f.local)}" list="locais"><datalist id="locais">${[...new Set(Object.values(S.equipas).map(x => x.local).concat(Object.values(S.sessoes).map(x => x.local)).filter(Boolean))].map(l => `<option>${esc(l)}</option>`).join("")}</datalist></div>
-    <div class="field"><span class="lbl">A sessão foi dada?</span><div class="seg" id="fEstado"><button data-v="dada">Sim, foi dada</button><button data-v="nao_dada">Não foi dada</button></div></div>
+    <div class="field"><span class="lbl">A sessão foi realizada?</span><div class="seg" id="fEstado"><button data-v="dada">Sim, foi realizada</button><button data-v="nao_dada">Não foi realizada</button></div></div>
     <div id="blocoDada" class="field" style="gap:14px">
       <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><output id="fN">${f.nAtletas}</output><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
@@ -772,7 +772,7 @@ function verSessao(id) {
     ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
       ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
       ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
-      : `<div class="field"><span class="lbl">Não foi dada</span><span>${esc(s.motivo)}</span></div>`}
+      : `<div class="field"><span class="lbl">Não foi realizada</span><span>${esc(s.motivo)}</span></div>`}
     <div class="actions"><button class="btn" data-close>Fechar</button></div>`);
 }
 
@@ -1152,7 +1152,7 @@ function nomeDeEmail(em) {
 function horaDe(ts) { const d = new Date(ts); return dataCurta(isoDe(d)) + " às " + d.toTimeString().slice(0, 5); }
 function quemFoi(x) { return x?._por ? `<span class="m">Última alteração: ${esc(nomeDeEmail(x._por))}, ${horaDe(x._em)}</span>` : ""; }
 const TAB_NOME = { sessoes: "a sessão", equipas: "o escalão", pessoas: "a pessoa", avaliacoes: "a avaliação", atletas: "o atleta", notas: "a nota da sessão", exercicios: "o exercício", plano: "o plano anual", planos: "o plano de sessão", material: "o material", planeadas: "o planeamento", semanas: "o planeamento", acessos: "o acesso", reunioes: "a reunião" };
-const CAMPO_NOME = { hora: "hora", local: "local", duracao: "duração", nAtletas: "nº de atletas", estado: "se foi dada", motivo: "motivo", resumo: "resumo", correu: "como correu", itens: "exercícios", exercicios: "exercícios", horario: "horário fixo", treinos: "treinos", responsavel: "PF", preparador: "PF", treinadores: "treinadores", novaData: "dia", novaHora: "hora", novoLocal: "local", novaDuracao: "duração", cancelada: "cancelamento", temas: "temas", tema: "temas", nome: "nome", telefone: "telefone", email: "email", funcao: "função", modalidade: "modalidade", escalao: "escalão", data: "data", texto: "texto", papel: "papel", foco: "foco", ativa: "ativo/inativo" };
+const CAMPO_NOME = { hora: "hora", local: "local", duracao: "duração", nAtletas: "nº de atletas", estado: "se foi realizada", motivo: "motivo", resumo: "resumo", correu: "como correu", itens: "exercícios", exercicios: "exercícios", horario: "horário fixo", treinos: "treinos", responsavel: "PF", preparador: "PF", treinadores: "treinadores", novaData: "dia", novaHora: "hora", novoLocal: "local", novaDuracao: "duração", cancelada: "cancelamento", temas: "temas", tema: "temas", nome: "nome", telefone: "telefone", email: "email", funcao: "função", modalidade: "modalidade", escalao: "escalão", data: "data", texto: "texto", papel: "papel", foco: "foco", ativa: "ativo/inativo" };
 function descHist(h) {
   const d = h.depois?.data || h.antes?.data || {}, t = h.tabela;
   let alvo = "";
@@ -1219,7 +1219,7 @@ function viewSemana() {
     doDia.forEach(p => {
       const e = S.equipas[p.equipaId] || {}, s = sessaoDe(p), pf = pfDe(p), cor = corMod(e.modalidade);
       const alterada = p.cancelada || p.mudada || p.mudouLocal || p.mudouHora;
-      const estado = s ? (s.estado === "dada" ? `<span class="wk-st ok">✓ dada</span>` : `<span class="wk-st bad">não dada</span>`) : p.cancelada ? `<span class="wk-st bad">não há</span>` : alterada ? `<span class="wk-st warn">alterada</span>` : "";
+      const estado = s ? (s.estado === "dada" ? `<span class="wk-st ok">✓ realizada</span>` : `<span class="wk-st bad">não realizada</span>`) : p.cancelada ? `<span class="wk-st bad">não há</span>` : alterada ? `<span class="wk-st warn">alterada</span>` : "";
       html += `<button class="wk-card${p.cancelada ? " off" : ""}" style="--c:${cor}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}" title="${p.motivo ? esc(p.motivo) : "Alterar hora, local ou dia"}">
         <span class="wk-hora">${esc(horaStd(p.hora) || "—")}<span class="m">–${minFim(p.hora, p.duracao)}</span></span>
         <span class="wk-mod">${esc(e.modalidade || "")}</span>${e.escalao ? `<span class="m">${esc(e.escalao)}</span>` : ""}
