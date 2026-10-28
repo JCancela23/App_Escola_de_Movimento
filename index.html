@@ -80,6 +80,26 @@ button.item:hover { border-color: var(--muted) }
 .stat span { font-size: 11px; overflow-wrap: anywhere; color: var(--muted); text-transform: uppercase; letter-spacing: .05em }
 @media (max-width: 440px) { .stats { grid-template-columns: repeat(2, 1fr) } }
 
+.wk { overflow-x: auto; margin-inline: -4px; padding: 2px 4px 8px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch }
+.wk-grid { display: grid; gap: 8px; min-width: min-content }
+.wk-col { display: grid; align-content: start; gap: 8px; scroll-snap-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px }
+.wk-col.hoje { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent) }
+.wk-h { font-size: 14px; color: var(--muted); padding: 2px 4px 4px; border-bottom: 1px solid var(--line) }
+.wk-h b { color: var(--fg); font-family: var(--display); letter-spacing: .04em }
+.wk-hoje { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase }
+.wk-card { display: grid; gap: 3px; text-align: left; cursor: pointer; border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); border-left: 5px solid var(--c); background: color-mix(in srgb, var(--c) 12%, var(--bg)); border-radius: 10px; padding: 8px 9px; color: var(--fg); min-width: 0 }
+.wk-card:hover { border-color: var(--c) }
+.wk-card.off { opacity: .55 }
+.wk-card.off .wk-mod, .wk-card.off .wk-hora { text-decoration: line-through }
+.wk-card .m { font-size: 12.5px }
+.wk-hora { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 16px }
+.wk-mod { font-weight: 700; color: var(--c); line-height: 1.2; overflow-wrap: anywhere }
+.wk-loc { font-size: 13.5px; overflow-wrap: anywhere }
+.wk-pf { font-size: 12px; font-weight: 700; color: #fff; border-radius: 999px; padding: 1px 9px }
+.wk-st { font-size: 11.5px; font-weight: 700 }
+.wk-st.ok { color: var(--accent) } .wk-st.bad { color: #e03131 } .wk-st.warn { color: #e67700 }
+.wk-vazio { text-align: center; padding: 6px 0 }
+.filters .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px }
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px }
 .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent) }
 .btn.ghost { background: transparent }
@@ -1102,28 +1122,52 @@ function viewGerirTemas() {
     <div class="item">${Object.keys(TEMAS).map(t => `<div class="row">${chipTema(t)}${TEMAS_BASE[t] ? `<span class="m">base</span>` : `<button class="btn ghost" data-rmtema="${t}">Apagar</button>`}</div>`).join("")}
       <div class="row"><input type="text" id="novoTema" placeholder="Novo tema (ex.: Geral)" aria-label="Nome do novo tema" style="flex:1;min-width:0"><button class="btn primary" id="addTema">Adicionar</button></div></div></section>`;
 }
-let semOffset = 0;
+let semOffset = 0, semPF = "todos";
+// Cores fixas por modalidade (as restantes vêm da paleta pela ordem)
+const COR_MOD = { "Hóquei em patins": "#2f9e44", "Basquetebol": "#d6336c", "Triatlo": "#7b6f5d", "Andebol": "#74b816", "Voleibol": "#f08c00", "Natação": "#1c9ab8", "Futsal": "#3b7ddd" };
+const PALETA = ["#7048e8", "#c2255c", "#0c8599", "#e8590c", "#5c940d", "#1971c2"];
+function corMod(m) { if (COR_MOD[m]) return COR_MOD[m]; const ms = modalidades(); return PALETA[Math.max(0, ms.indexOf(m)) % PALETA.length]; }
+const COR_PF = ["#d9480f", "#2b8a3e", "#5f3dc4", "#0b7285", "#a61e4d"];
+function corPF(id) { const ids = [...new Set(Object.values(EQ()).map(e => e.responsavel).filter(Boolean))].sort((x, y) => pessoaNome(x).localeCompare(pessoaNome(y))); return COR_PF[Math.max(0, ids.indexOf(id)) % COR_PF.length]; }
+const primeiroNome = id => (pessoaNome(id) || "").split(" ")[0];
+function minFim(hora, dur) { const [h, m] = (horaStd(hora) || "00:00").split(":").map(Number); const t = h * 60 + m + (+dur || 0); return String(Math.floor(t / 60) % 24).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
 function viewSemana() {
   if (!podeEscrever()) return "";
   const hoje = new Date(), seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7) + semOffset * 7);
-  const de = isoDe(seg), ate = somaDias(de, 6), lista = previstas(de, ate);
-  const fim = new Date(ate + "T12:00");
-  let html = `<section><div class="sec-h"><h2>Horário da semana</h2><span class="sub">área da equipa técnica</span></div>
+  const de = isoDe(seg), ate = somaDias(de, 6), todas = previstas(de, ate);
+  const pfDe = p => sessaoDe(p)?.preparador || S.equipas[p.equipaId]?.responsavel || "";
+  const pfs = [...new Set(todas.map(pfDe))].sort((x, y) => (pessoaNome(x) || "~").localeCompare(pessoaNome(y) || "~"));
+  if (semPF !== "todos" && !pfs.includes(semPF)) semPF = "todos";
+  const lista = todas.filter(p => semPF === "todos" || pfDe(p) === semPF), ativas = lista.filter(p => !p.cancelada);
+  const fim = new Date(ate + "T12:00"), minutos = ativas.reduce((t, p) => t + (+p.duracao || 0), 0);
+  const dias = [0, 1, 2, 3, 4, 5, 6].filter(i => i < 5 || lista.some(p => p.data === somaDias(de, i)));
+  let html = `<section><div class="sec-h"><h2>Horário da semana</h2></div>
     <div class="row"><button class="btn" data-sem="-1" aria-label="Semana anterior">‹</button><span class="t">${seg.getDate()} ${MESES[seg.getMonth()].slice(0, 3)} a ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)}${semOffset === 0 ? " · esta semana" : ""}</span><button class="btn" data-sem="1" aria-label="Semana seguinte">›</button></div>
-    <div class="list">`;
-  for (let i = 0; i < 7; i++) {
-    const d = somaDias(de, i), doDia = lista.filter(p => p.data === d);
-    if (!doDia.length) continue;
-    html += `<div class="item"><span class="lbl" style="${d === hojeISO() ? "color:var(--accent)" : ""}">${dataCurta(d)}${d === hojeISO() ? " · hoje" : ""}</span>`;
+    <div class="stats"><div class="stat"><b>${ativas.length}</b><span>sessões</span></div><div class="stat"><b>${Math.floor(minutos / 60)}h${String(minutos % 60).padStart(2, "0")}</b><span>de intervenção</span></div>${pfs.filter(Boolean).slice(0, 2).map(id => `<div class="stat"><b style="color:${corPF(id)}">${todas.filter(p => !p.cancelada && pfDe(p) === id).length}</b><span>${esc(primeiroNome(id))}</span></div>`).join("")}</div>
+    ${pfs.length > 1 ? `<div class="filters" id="semPF"><button data-v="todos" aria-pressed="${semPF === "todos"}">Todos</button>${pfs.map(id => `<button data-v="${id}" aria-pressed="${semPF === id}">${id ? `<span class="dot" style="background:${corPF(id)}"></span>${esc(pessoaNome(id))}` : "Sem PF"}</button>`).join("")}</div>` : ""}
+    <div class="wk" role="region" aria-label="Horário da semana" tabindex="0"><div class="wk-grid" style="grid-template-columns:${dias.map(i => lista.some(p => p.data === somaDias(de, i)) ? "minmax(138px,1fr)" : "minmax(64px,.45fr)").join(" ")}">`;
+  setTimeout(() => { const w = $(".wk"), c = $(".wk-col.hoje"); if (w && c && w.scrollWidth > w.clientWidth) w.scrollLeft = c.offsetLeft - w.offsetLeft - 4; }, 0);
+  dias.forEach(i => {
+    const d = somaDias(de, i), doDia = lista.filter(p => p.data === d), eHoje = d === hojeISO();
+    const dt = new Date(d + "T12:00");
+    html += `<div class="wk-col${eHoje ? " hoje" : ""}"><div class="wk-h"><b>${DIAS[dt.getDay()]}</b> ${dt.getDate()} ${MESES[dt.getMonth()].slice(0, 3)}${eHoje ? ` <span class="wk-hoje">hoje</span>` : ""}</div>`;
     doDia.forEach(p => {
+      const e = S.equipas[p.equipaId] || {}, s = sessaoDe(p), pf = pfDe(p), cor = corMod(e.modalidade);
       const alterada = p.cancelada || p.mudada || p.mudouLocal || p.mudouHora;
-      html += `<div class="row" style="align-items:flex-start"><span><span class="t" style="${p.cancelada ? "text-decoration:line-through" : ""}">${esc(equipaNome(p.equipaId))}</span><br><span class="m">${esc(p.hora)} · ${esc(p.local)}${p.cancelada ? " · não há: " + esc(p.motivo) : p.mudada ? " · mudada de " + dataCurta(p.mudada) + (p.motivo ? " (" + esc(p.motivo) + ")" : "") : p.motivo && alterada ? " · " + esc(p.motivo) : ""}</span></span>
-        <button class="btn ${alterada ? "" : "ghost"}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">${alterada ? "Alterada" : "Alterar"}</button></div>`;
+      const estado = s ? (s.estado === "dada" ? `<span class="wk-st ok">✓ dada</span>` : `<span class="wk-st bad">não dada</span>`) : p.cancelada ? `<span class="wk-st bad">não há</span>` : alterada ? `<span class="wk-st warn">alterada</span>` : "";
+      html += `<button class="wk-card${p.cancelada ? " off" : ""}" style="--c:${cor}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}" title="${p.motivo ? esc(p.motivo) : "Alterar hora, local ou dia"}">
+        <span class="wk-hora">${esc(horaStd(p.hora) || "—")}<span class="m">–${minFim(p.hora, p.duracao)}</span></span>
+        <span class="wk-mod">${esc(e.modalidade || "")}</span>${e.escalao ? `<span class="m">${esc(e.escalao)}</span>` : ""}
+        <span class="wk-loc">${esc(p.local || "Local por definir")}</span>
+        <span class="row" style="gap:6px;justify-content:flex-start;flex-wrap:wrap"><span class="m">${p.duracao}'</span>${pf ? `<span class="wk-pf" style="background:${corPF(pf)}">${esc(primeiroNome(pf))}</span>` : `<span class="wk-st warn">sem PF</span>`}${estado}</span>
+        ${p.mudada ? `<span class="m">mudada de ${dataCurta(p.mudada)}</span>` : ""}</button>`;
     });
+    if (!doDia.length) html += `<span class="m wk-vazio">—</span>`;
     html += `</div>`;
-  }
-  if (!lista.length) html += `<div class="empty">Sem treinos nesta semana.</div>`;
-  return html + `</div></section>`;
+  });
+  html += `</div></div>`;
+  if (!todas.length) html += `<div class="empty">Sem sessões nesta semana.</div>`;
+  return html + `<span class="m">${dias.length > 2 ? "No telemóvel, deslize para o lado para ver os outros dias. " : ""}Toque numa sessão para mudar a hora, o local ou o dia só nessa semana. O horário fixo muda-se em Mais › Pessoas e escalões.</span></section>`;
 }
 function tarefasAbertas() {
   return Object.entries(S.reunioes).flatMap(([rid, r]) => (r.tarefas || []).map((t, i) => ({ ...t, rid, i, reuniao: r.data }))).filter(t => !t.feito && t.texto)
@@ -1364,6 +1408,7 @@ $("#view").addEventListener("click", e => {
     return;
   }
   const sb2 = e.target.closest("[data-sem]"); if (sb2) { semOffset += +sb2.dataset.sem; return render(); }
+  if (e.target.closest("#semPF button")) { semPF = e.target.closest("button").dataset.v; return render(); }
   if (e.target.closest("#relP button")) { relPeriodo = e.target.closest("button").dataset.v; relOffset = 0; return render(); }
   const rb = e.target.closest("[data-rel]"); if (rb) { relOffset = Math.min(0, relOffset + +rb.dataset.rel); return render(); }
   const epb = e.target.closest("[data-ep]"); if (epb) { epocaSel = epb.dataset.ep === epocaDe(hojeISO()) ? null : epb.dataset.ep; avalSel.equipaId = null; filtroEquipa = "todas"; return render(); }
