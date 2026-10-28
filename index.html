@@ -792,11 +792,12 @@ function viewExercicios() {
 }
 function viewListaExercicios() {
   let lista = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome));
-  if (filtroTema !== "todos") lista = lista.filter(e => e.tema === filtroTema);
+  if (filtroTema === "sem") lista = lista.filter(e => !TEMAS[e.tema]);
+  else if (filtroTema !== "todos") lista = lista.filter(e => e.tema === filtroTema);
   let html = `<section><div class="sec-h"><h2>Exercícios</h2><span class="sub">${lista.length}</span></div>`;
-  html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${esc(TEMAS[t].nome)}</button>`).join("")}</div>`;
+  html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${esc(TEMAS[t].nome)}</button>`).join("")}<button data-ftema="sem" aria-pressed="${filtroTema === "sem"}">Sem tema</button></div>`;
   if (podeGerir()) html += `<button class="btn" data-act="novoExercicio">Adicionar exercício</button>`;
-  html += `<div class="list">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">Sem exercícios neste tema.</div>`}</div></section>`;
+  html += `<div class="list">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">${filtroTema === "sem" ? "Não há exercícios sem tema." : "Sem exercícios neste tema."}</div>`}</div></section>`;
   return html;
 }
 function verExercicio(id) {
@@ -810,10 +811,10 @@ function verExercicio(id) {
   $("#eEdit", el)?.addEventListener("click", () => formExercicio(e));
 }
 function formExercicio(e) {
-  e = e || { tema: filtroTema !== "todos" ? filtroTema : (temaDoMes(mesKey(new Date())) || "saltar") };
+  e = e || { tema: TEMAS[filtroTema] ? filtroTema : "" };
   const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
     <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
-    <div class="field"><label for="xTema">Tema</label><select id="xTema">${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
+    <div class="field"><label for="xTema">Tema (opcional)</label><select id="xTema"><option value="">Sem tema</option>${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="xDur">Duração (min)</label><input type="number" id="xDur" min="1" max="30" value="${e.duracao || 5}"></div>
     <div class="field"><label for="xVideo">Link do vídeo (YouTube, Instagram, Drive…)</label><input type="url" id="xVideo" value="${esc(e.video)}" placeholder="https://"></div>
     <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
@@ -899,7 +900,7 @@ function optExercicios(sel, tema) {
   const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), op = x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`;
   const pri = [].concat(tema || []).filter(t => TEMAS[t]);
   return [...pri, ...Object.keys(TEMAS).filter(t => !pri.includes(t))].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(op).join("")}</optgroup>`).join("")
-    + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Outros">${exs.filter(x => !TEMAS[x.tema]).map(op).join("")}</optgroup>` : "");
+    + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Sem tema">${exs.filter(x => !TEMAS[x.tema]).map(op).join("")}</optgroup>` : "");
 }
 function linhaItem(i, tema) {
   return `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
