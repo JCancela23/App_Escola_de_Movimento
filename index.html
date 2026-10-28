@@ -1476,8 +1476,9 @@ S.acessos = {};
 async function carregar(col) {
   const out = {};
   for (let de = 0; ; de += 1000) {
-    const { data, error } = await sb.from(col).select("id,data,papel,nome").range(de, de + 999);
-    if (error || !data) break;
+    const { data, error } = await sb.from(col).select(col === "acessos" ? "id,papel,nome" : "id,data").range(de, de + 999);
+    if (error) { console.error("Erro ao carregar " + col, error); toast("Não foi possível carregar os dados: " + erroPT(error)); break; }
+    if (!data) break;
     data.forEach(r => out[r.id] = col === "acessos" ? { papel: r.papel, nome: r.nome } : r.data);
     if (data.length < 1000) break;
   }
