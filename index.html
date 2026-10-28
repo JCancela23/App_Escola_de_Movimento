@@ -164,10 +164,30 @@ a { color: var(--accent) }
 <script src="vendor/supabase-2.99.3.js"></script>
 <script src="config.js"></script>
 <script>
-const TEMAS = {
+const TEMAS_BASE = {
   saltar: { nome: "Saltar" }, gatinhar: { nome: "Gatinhar" },
   empurrar: { nome: "Empurrar" }, puxar: { nome: "Puxar" }
 };
+// temas base + temas criados pela coordenação (guardados em plano/config.temas)
+const TEMAS = { ...TEMAS_BASE };
+const CORES_EXTRA = ["#6b7a2f", "#8a4f9e", "#2f7bb5", "#b5562f", "#5a6b73", "#a8466e"];
+function atualizarTemas() {
+  Object.keys(TEMAS).forEach(k => { if (!TEMAS_BASE[k]) delete TEMAS[k]; });
+  Object.entries(S.plano.config?.temas || {}).forEach(([k, v]) => { if (!TEMAS_BASE[k]) TEMAS[k] = { nome: v.nome, cor: v.cor }; });
+}
+const corTema = t => TEMAS_BASE[t] ? `var(--${t})` : (TEMAS[t]?.cor || "var(--muted)");
+const nomeTema = t => TEMAS[t]?.nome || "Tema apagado";
+const temasDe = x => !x ? [] : Array.isArray(x.temas) && x.temas.length ? x.temas : x.tema ? [x.tema] : [];
+const segTemas = sel => Object.keys(TEMAS).map(t => `<button data-v="${t}" aria-pressed="${sel.includes(t)}">${esc(TEMAS[t].nome)}</button>`).join("");
+// escolha de um ou mais temas (o array sel é alterado no lugar)
+function ligarSegTemas(box, sel) {
+  box.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const i = sel.indexOf(b.dataset.v);
+    if (i >= 0) { if (sel.length > 1) sel.splice(i, 1); } else sel.push(b.dataset.v);
+    box.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(sel.includes(x.dataset.v))));
+  });
+}
 const TEMAS_AVALIADOS = ["gatinhar", "saltar"];
 const FERIAS = "Feriado ou férias";
 const MOTIVOS = ["Espaço ocupado", "Treino cancelado", "Jogo da equipa sénior", "Jogo ou torneio", "Poucos atletas", "Atraso do treino", "Feriado ou férias", "Falta de preparador", "Outro"];
@@ -214,8 +234,9 @@ function horarioNoDia(e, iso) { const dow = new Date(iso + "T12:00").getDay(); r
 function pessoaNome(id) { return S.pessoas[id]?.nome || ""; }
 function preparadores() { return sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome)).filter(p => p.funcao === "Preparador físico" || p.funcao === "Coordenador"); }
 function equipaNome(id) { const e = S.equipas[id]; return e ? (e.modalidade + " " + (e.escalao || "")).trim() : "Equipa removida"; }
-function temaDoMes(k) { return S.plano[k]?.tema || null; }
-function chipTema(t) { return t ? `<span class="chip c-${t}"><span class="dot"></span>${TEMAS[t].nome}</span>` : ""; }
+function temaDoMes(k) { return temasDe(S.plano[k])[0] || null; }
+const temasDoMes = k => temasDe(S.plano[k]);
+function chipTema(t) { return [].concat(t || []).filter(x => TEMAS[x]).map(x => `<span class="chip" style="color:${corTema(x)}"><span class="dot"></span>${esc(nomeTema(x))}</span>`).join(" "); }
 // Três maneiras de usar: coordenação (tudo), preparador físico (regista) e consulta (pais, treinadores, direção)
 let vistaComo = null; // a coordenação pode pré-visualizar as outras maneiras
 const VISTAS = { admin: "Coordenação", write: "Preparador físico", view: "Pais, treinadores e direção" };
@@ -260,9 +281,10 @@ const novoId = p => p + "_" + Date.now().toString(36) + Math.random().toString(3
 function renderHeader() {
   const k = mesKey(new Date()), p = S.plano[k];
   const h = $("#heroTema");
-  h.textContent = p ? TEMAS[p.tema].nome : "Sem tema";
-  h.className = p ? "c-" + p.tema : "";
-  $("#heroMes").textContent = "tema de " + mesNome(k);
+  const tm = temasDe(p);
+  h.textContent = tm.length ? tm.map(nomeTema).join(" + ") : "Sem tema";
+  h.style.color = tm.length ? corTema(tm[0]) : "";
+  $("#heroMes").textContent = (tm.length > 1 ? "temas de " : "tema de ") + mesNome(k);
   $("#heroFoco").textContent = p?.foco || (podeGerir() ? "Defina o tema do mês em Mais › Plano anual." : "");
   $("#role").textContent = vistaComo ? "A ver como: " + { write: "PF", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
   const avisoEp = epocaSel ? `<div class="banner">Está a ver a época <b>${epocaSel}</b>. <button class="btn" id="epAtual">Voltar à época atual</button></div>` : "";
@@ -430,7 +452,7 @@ function calcRelatorio() {
   });
   const porPessoa = {}; dadas.forEach(l => { const n = pessoaNome(l.dadaPor) || "Não indicado"; porPessoa[n] = (porPessoa[n] || 0) + 1; });
   const motivos = {}; nao.forEach(l => { const m = l.motivo || "Outro"; motivos[m] = (motivos[m] || 0) + 1; });
-  const temas = {}; regs.filter(r => r.estado === "dada").forEach(r => { const t = TEMAS[r.tema]?.nome || "Sem tema"; temas[t] = (temas[t] || 0) + 1; });
+  const temas = {}; regs.filter(r => r.estado === "dada").forEach(r => { const l = temasDe(r); (l.length ? l.map(nomeTema) : ["Sem tema"]).forEach(t => temas[t] = (temas[t] || 0) + 1); });
   const ativas = Object.values(EQ()).filter(e => e.ativa !== false);
   const modalidadesAbr = [...new Set(ativas.map(e => e.modalidade))].sort();
   const escaloes = ativas.length;
@@ -439,7 +461,7 @@ function calcRelatorio() {
   const tarefas = reun.flatMap(r => r.tarefas || []);
   const aval = {}; Object.values(S.avaliacoes).filter(a => a.mes >= P.de.slice(0, 7) && a.mes <= P.ate.slice(0, 7)).forEach(a => {
     const v = Object.values(a.resultados || {}).filter(Boolean); if (!v.length) return;
-    const t = TEMAS[a.tema]?.nome || a.tema; const x = aval[t] = aval[t] || { soma: 0, n: 0 }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
+    const t = nomeTema(a.tema); const x = aval[t] = aval[t] || { soma: 0, n: 0 }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
   return { P, linhas, dadas, nao, porReg, ferias, atletas, porMod, porPessoa, motivos, temas, modalidadesAbr, escaloes, reun, tarefas, aval };
 }
 function barras(obj, cor, total) {
@@ -564,14 +586,14 @@ function viewMes() {
 function viewTemas() {
   const k0 = mesKey(new Date()), inicio = anoEpoca(epocaVista());
   const dadasPorMes = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada") { const mk = s.data.slice(0, 7); dadasPorMes[mk] = (dadasPorMes[mk] || 0) + 1; } });
-  const abordados = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada" && TEMAS[s.tema]) abordados[TEMAS[s.tema].nome] = (abordados[TEMAS[s.tema].nome] || 0) + 1; });
+  const abordados = {}; Object.values(S.sessoes).forEach(s => { if (s.estado === "dada") temasDe(s).filter(t => TEMAS[t]).forEach(t => abordados[nomeTema(t)] = (abordados[nomeTema(t)] || 0) + 1); });
   const total = Object.values(abordados).reduce((a, b) => a + b, 0);
   let html = "";
   if (total) html += `<section><div class="sec-h"><h2>Temas já abordados</h2><span class="sub">${total} sessões dadas</span></div><div class="item">${barras(abordados, "var(--accent)", total)}</div></section>`;
   html += `<section><div class="sec-h"><h2>Planeamento da época</h2><span class="sub">${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="list">`;
   for (let i = 0; i < 10; i++) {
     const k = mesKey(new Date(inicio, 8 + i, 1)), p = S.plano[k], estado = k < k0 ? "Abordado" : k === k0 ? "Em curso" : "Previsto";
-    html += `<div class="item" style="${k === k0 ? "border-color:var(--accent)" : ""}"><div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(p.tema) : `<span class="m">Por definir</span>`}</div>
+    html += `<div class="item" style="${k === k0 ? "border-color:var(--accent)" : ""}"><div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(temasDe(p)) : `<span class="m">Por definir</span>`}</div>
       <span class="m">${estado}${dadasPorMes[k] ? " · " + dadasPorMes[k] + " sessões dadas" : ""}${p?.foco ? " · " + esc(p.foco) : ""}</span></div>`;
   }
   return html + `</div></section>`;
@@ -608,7 +630,7 @@ function itemSessao(s) {
   const linha = s.estado === "dada" ? (CORREU.find(c => c.v === s.correu)?.t || "") + (s.resumo ? " · " + esc(s.resumo) : "") : esc(s.motivo || "");
   return `<button class="item" data-act="verSessao" data-id="${s.id}">
     <div class="row"><span class="t">${esc(equipaNome(s.equipaId))}</span>${estado}</div>
-    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${pessoaNome(s.dadaPor) ? " · " + esc(pessoaNome(s.dadaPor)) : ""}${s.exemplo ? " · exemplo" : ""}</span>${chipTema(s.tema)}</div>
+    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${pessoaNome(s.dadaPor) ? " · " + esc(pessoaNome(s.dadaPor)) : ""}${s.exemplo ? " · exemplo" : ""}</span>${chipTema(temasDe(s))}</div>
     ${linha ? `<span class="m">${linha}</span>` : ""}</button>`;
 }
 
@@ -620,10 +642,11 @@ function formSessao(s) {
   const eqS = S.equipas[s?.equipaId || sugerida] || {};
   if (s) ["hora", "local", "duracao"].forEach(k => { if (s[k] == null || s[k] === "") delete s[k]; });
   const hS = eqS.modalidade ? horarioNoDia(eqS, s?.data || hoje) : {};
-  const f = Object.assign({ hora: hS.hora || "", local: hS.local || "", duracao: hS.duracao || 20 }, { data: hoje, equipaId: sugerida, estado: "dada", nAtletas: 10, correu: 3, motivo: "", resumo: "", tema: temaDoMes(mesKey(new Date())) || "saltar", exercicios: [], itens: [] }, s || {});
+  const f = Object.assign({ hora: hS.hora || "", local: hS.local || "", duracao: hS.duracao || 20 }, { data: hoje, equipaId: sugerida, estado: "dada", nAtletas: 10, correu: 3, motivo: "", resumo: "", exercicios: [], itens: [] }, s || {});
+  f.temas = (s ? temasDe(s) : []).slice(); if (!f.temas.length) f.temas = temasDoMes(mesKey(new Date())).slice(); if (!f.temas.length) f.temas = ["saltar"];
   if (!f.itens?.length && f.exercicios?.length) f.itens = f.exercicios.map(x => ({ parte: "principal", exercicioId: x }));
   const plS = !s?.id && planoDaSessao(f.equipaId, f.data);
-  if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (plS.tema) f.tema = plS.tema; }
+  if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (temasDe(plS).length) f.temas = temasDe(plS).slice(); }
   let nota = s?.id ? (S.notas[s.id]?.texto || "") : "";
 
   const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>
@@ -637,10 +660,10 @@ function formSessao(s) {
     <div id="blocoDada" class="field" style="gap:14px">
       <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><output id="fN">${f.nAtletas}</output><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
-      <div class="field"><span class="lbl">Tema</span><div class="seg" id="fTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="fTema">${segTemas(f.temas)}</div></div>
       <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
         <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join("")}</select></div>
-      <div id="fItens">${editorItens(f.itens, f.tema)}</div>
+      <div id="fItens">${editorItens(f.itens, f.temas)}</div>
       <div class="field"><label for="fResumo">Resumo (visível para treinadores e pais)</label><input type="text" id="fResumo" value="${esc(f.resumo)}" placeholder="Ex.: Boa adesão, rever receção dos saltos"></div>
     </div>
     <div id="blocoNao" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="fMotivo">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
@@ -654,11 +677,11 @@ function formSessao(s) {
     sync();
   };
   const vis = () => { $("#blocoDada", el).hidden = f.estado !== "dada"; $("#blocoNao", el).hidden = f.estado === "dada"; };
-  ligarEditorItens(el, () => f.tema);
+  ligarEditorItens(el, () => f.temas);
   $("#fPlano", el).addEventListener("change", ev => {
     const pl = S.planos[ev.target.value]; if (!pl) return;
-    if (pl.tema) { f.tema = pl.tema; $("#fTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === f.tema))); }
-    $("#fItens", el).innerHTML = editorItens(pl.itens, f.tema); toast("Exercícios do plano carregados");
+    if (temasDe(pl).length) { f.temas.splice(0, f.temas.length, ...temasDe(pl)); $("#fTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(f.temas.includes(b.dataset.v)))); }
+    $("#fItens", el).innerHTML = editorItens(pl.itens, f.temas); toast("Exercícios do plano carregados");
   });
   const fPor = $("#fPor", el);
   fPor.value = s?.dadaPor ?? S.equipas[f.equipaId]?.responsavel ?? "";
@@ -667,13 +690,13 @@ function formSessao(s) {
     if (!s?.dadaPor) fPor.value = q.responsavel || "";
     if (!s?.id && q.modalidade) { const h = horarioNoDia(q, $("#fData", el).value || hoje); $("#fHora", el).value = h.hora || ""; $("#fLocal", el).value = h.local || ""; $("#fDur", el).value = h.duracao || 20; }
   });
-  seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); seg("#fTema", "tema"); seg("#fMotivo", "motivo"); vis();
+  seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); ligarSegTemas($("#fTema", el), f.temas); seg("#fMotivo", "motivo"); vis();
   el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, f.nAtletas + +b.dataset.step); $("#fN", el).textContent = f.nAtletas; }));
 
   $("#fOk", el).addEventListener("click", async () => {
     const id = s?.id || novoId("s");
     const dados = {
-      data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.tema,
+      data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.temas[0], temas: f.temas.slice(),
       nAtletas: f.estado === "dada" ? f.nAtletas : 0, correu: f.estado === "dada" ? f.correu : null,
       itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
       motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
@@ -698,7 +721,7 @@ function verSessao(id) {
   if (podeEscrever()) return formSessao(s);
   const exs = (s.exercicios || []).map(x => S.exercicios[x]?.nome).filter(Boolean);
   abrirFolha(`<h2>${esc(equipaNome(s.equipaId))}</h2>
-    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " · " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${s.duracao ? " · " + s.duracao + " min" : ""}</span>${chipTema(s.tema)}</div>
+    <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " · " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${s.duracao ? " · " + s.duracao + " min" : ""}</span>${chipTema(temasDe(s))}</div>
     ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
       ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
       ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
@@ -724,7 +747,7 @@ function viewListaExercicios() {
   let lista = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome));
   if (filtroTema !== "todos") lista = lista.filter(e => e.tema === filtroTema);
   let html = `<section><div class="sec-h"><h2>Exercícios</h2><span class="sub">${lista.length}</span></div>`;
-  html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${TEMAS[t].nome}</button>`).join("")}</div>`;
+  html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${esc(TEMAS[t].nome)}</button>`).join("")}</div>`;
   if (podeGerir()) html += `<button class="btn" data-act="novoExercicio">Adicionar exercício</button>`;
   html += `<div class="list">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">Sem exercícios neste tema.</div>`}</div></section>`;
   return html;
@@ -743,7 +766,7 @@ function formExercicio(e) {
   e = e || { tema: filtroTema !== "todos" ? filtroTema : (temaDoMes(mesKey(new Date())) || "saltar") };
   const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
     <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
-    <div class="field"><label for="xTema">Tema</label><select id="xTema">${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${TEMAS[t].nome}</option>`).join("")}</select></div>
+    <div class="field"><label for="xTema">Tema</label><select id="xTema">${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="xDur">Duração (min)</label><input type="number" id="xDur" min="1" max="30" value="${e.duracao || 5}"></div>
     <div class="field"><label for="xVideo">Link do vídeo (YouTube, Instagram, Drive…)</label><input type="url" id="xVideo" value="${esc(e.video)}" placeholder="https://"></div>
     <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
@@ -779,7 +802,7 @@ function htmlPlano(pl) {
       ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
       ${i.obs ? `<span><b>Obs.:</b> ${esc(i.obs)}</span>` : ""}
       ${x.video ? `<a class="video-link" href="${esc(x.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a>` : ""}</div>`; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
-  return `${pl.tema ? chipTema(pl.tema) : ""}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
+  return `${chipTema(temasDe(pl))}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
     ${(pl.material || []).length ? `<div class="field"><span class="lbl">Material</span>${pl.material.filter(m => S.material[m.materialId]).map(m => `<span>• ${esc(S.material[m.materialId].nome)}${m.qtd ? " × " + esc(m.qtd) : ""}</span>`).join("")}</div>` : ""}
     ${pl.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(pl.notas)}</span></div>` : ""}`;
 }
@@ -813,7 +836,7 @@ function viewPlanos() {
   html += `<div class="list">`;
   lista.forEach(pl => {
     const n = (pl.itens || []).length, nAq = (pl.itens || []).filter(i => parteDe(i) === "aquecimento").length, semanas = Object.entries(S.semanas).filter(([, w]) => w.planoId === pl.id).map(([k]) => k).sort();
-    html += `<button class="item" data-act="verPlano" data-id="${pl.id}"><div class="row"><span class="t">${esc(pl.nome)}</span>${chipTema(pl.tema)}</div>
+    html += `<button class="item" data-act="verPlano" data-id="${pl.id}"><div class="row"><span class="t">${esc(pl.nome)}</span>${chipTema(temasDe(pl))}</div>
       <span class="m">Aquecimento ${nAq} · parte principal ${n - nAq}${(pl.material || []).length ? " · " + pl.material.length + " material" : ""}${semanas.length ? " · semana de " + semanas.map(k => dataCurta(k).slice(4)).join(", ") : ""}</span></button>`;
   });
   if (!lista.length) html += `<div class="empty">Ainda não há planos.${podeGerir() ? " Crie o primeiro com Novo plano." : ""}</div>`;
@@ -827,7 +850,8 @@ function verPlano(id) {
 }
 function optExercicios(sel, tema) {
   const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), op = x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`;
-  return [tema, ...Object.keys(TEMAS).filter(t => t !== tema)].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(op).join("")}</optgroup>`).join("")
+  const pri = [].concat(tema || []).filter(t => TEMAS[t]);
+  return [...pri, ...Object.keys(TEMAS).filter(t => !pri.includes(t))].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(op).join("")}</optgroup>`).join("")
     + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Outros">${exs.filter(x => !TEMAS[x.tema]).map(op).join("")}</optgroup>` : "");
 }
 function linhaItem(i, tema) {
@@ -849,11 +873,10 @@ const lerItens = el => [...el.querySelectorAll("[data-item]")].map(r => ({ parte
 
 // op: { semana, tema, nome, depois } quando o plano é criado ao preparar o mês
 function formPlano(id, op = {}) {
-  const pl = id ? JSON.parse(JSON.stringify(S.planos[id])) : { nome: op.nome || "", tema: op.tema || temaDoMes(mesKey(new Date())) || "saltar", itens: [], material: [], notas: "" };
-  let tema = pl.tema;
+  const pl = id ? JSON.parse(JSON.stringify(S.planos[id])) : { nome: op.nome || "", itens: [], material: [], notas: "" };
+  const temas = (temasDe(pl).length ? temasDe(pl) : op.temas || temasDoMes(mesKey(new Date()))).slice(); if (!temas.length) temas.push("saltar");
   const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), mats = sorted(S.material, (a, b) => a.nome.localeCompare(b.nome));
-  const optEx = sel => [tema, ...Object.keys(TEMAS).filter(t => t !== tema)].map(t => `<optgroup label="${TEMAS[t].nome}">${exs.filter(x => x.tema === t).map(x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</optgroup>`).join("")
-    + (exs.some(x => !TEMAS[x.tema]) ? `<optgroup label="Outros">${exs.filter(x => !TEMAS[x.tema]).map(x => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</optgroup>` : "");
+  const optEx = sel => optExercicios(sel, temas);
   const linhaI = i => `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
       <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optEx(i.exercicioId)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
       <div class="row"><input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições"></div>
@@ -861,21 +884,19 @@ function formPlano(id, op = {}) {
   const linhaM = m => `<div class="row" data-mat><select class="mId" aria-label="Material" style="flex:2"><option value="">Escolher material</option>${mats.map(x => `<option value="${x.id}" ${x.id === m.materialId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select><input type="text" class="mQtd" value="${esc(m.qtd)}" placeholder="Qtd." aria-label="Quantidade" style="flex:1"><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>`;
   const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
     <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
-    <div class="field"><span class="lbl">Tema</span><div class="seg" id="plTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="plTema">${segTemas(temas)}</div></div>
     ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("")}
     ${exs.length ? "" : `<span class="m">Ainda não há exercícios na base de dados. Adicione-os em Exercícios.</span>`}
     <div class="field"><span class="lbl">Material</span><div class="list" id="plMat">${(pl.material || []).map(linhaM).join("")}</div>${mats.length ? `<button class="btn" id="plAddM">Adicionar material</button>` : `<span class="m">Registe primeiro o material em Exercícios › Material.</span>`}</div>
     <div class="field"><label for="plNotas">Notas gerais</label><textarea id="plNotas">${esc(pl.notas)}</textarea></div>
     <div class="actions">${id ? `<button class="btn danger" id="plDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="plOk">Guardar</button></div>`);
-  const sync = () => $("#plTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tema)));
-  $("#plTema", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { tema = b.dataset.v; sync(); } });
-  sync();
+  ligarSegTemas($("#plTema", el), temas);
   el.querySelectorAll("[data-addparte]").forEach(b => b.addEventListener("click", () => $("#pl_" + b.dataset.addparte, el).insertAdjacentHTML("beforeend", linhaI({ parte: b.dataset.addparte }))));
   $("#plAddM", el)?.addEventListener("click", () => $("#plMat", el).insertAdjacentHTML("beforeend", linhaM({})));
   el.addEventListener("click", ev => { const b = ev.target.closest("[data-rm]"); if (b) b.closest("[data-item],[data-mat]").remove(); });
   $("#plOk", el).addEventListener("click", async () => {
     const nome = $("#plNome", el).value.trim(); if (!nome) return toast("Dê um nome ao plano");
-    const dados = { nome, tema, notas: $("#plNotas", el).value.trim(),
+    const dados = { nome, tema: temas[0], temas: temas.slice(), notas: $("#plNotas", el).value.trim(),
       itens: [...el.querySelectorAll("[data-item]")].map(r => ({ parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() })).filter(i => i.exercicioId),
       material: [...el.querySelectorAll("[data-mat]")].map(r => ({ materialId: r.querySelector(".mId").value, qtd: r.querySelector(".mQtd").value.trim() })).filter(m => m.materialId) };
     const pid = id || novoId("pl");
@@ -959,7 +980,7 @@ function viewEvolucao() {
     const [eq, tema] = k.split("|");
     html += `<div class="item"><div class="row"><span class="t">${esc(equipaNome(eq))}</span>${chipTema(tema)}</div>`;
     linhas[k].sort((a, b) => a.mes.localeCompare(b.mes)).forEach(l => {
-      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / 4 * 100}%;background:var(--${tema})"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
+      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / 4 * 100}%;background:${corTema(tema)}"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
     });
     html += `</div>`;
   });
@@ -986,11 +1007,11 @@ function viewMais() {
   const k0 = mesKey(new Date());
   const inicio = anoEpoca(epocaVista()); // época de setembro a junho
   const meses = []; for (let i = 0; i < 10; i++) meses.push(mesKey(new Date(inicio, 8 + i, 1)));
-  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
+  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + viewGerirTemas() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
   meses.forEach(k => {
     const p = S.plano[k];
     html += `<button class="item" data-act="editPlano" data-id="${k}" ${podeGerir() ? "" : "disabled"} style="${k === k0 ? "border-color:var(--accent)" : ""}">
-      <div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(p.tema) : `<span class="m">Por definir</span>`}</div>
+      <div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(temasDe(p)) : `<span class="m">Por definir</span>`}</div>
       ${p?.foco ? `<span class="m">${esc(p.foco)}</span>` : ""}
       ${podeGerir() ? (() => { const sm = semanasDoMes(k), n = sm.filter(sg => S.planos[S.semanas[sg]?.planoId]).length; return `<span class="m">${n} de ${sm.length} semanas com plano</span>`; })() : ""}</button>`;
   });
@@ -1036,12 +1057,12 @@ function semanasDoMes(k) {
   return out;
 }
 function editPlano(k, rasc) {
-  const p = rasc || S.plano[k] || { tema: "saltar", foco: "" };
-  let tema = p.tema;
+  const p = rasc || S.plano[k] || { foco: "" };
+  const temas = temasDe(p).slice(); if (!temas.length) temas.push("saltar");
   const planos = sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome));
   const sem = semanasDoMes(k);
   const el = abrirFolha(`<h2 style="text-transform:capitalize">Preparar ${mesNome(k)}</h2>
-    <div class="field"><span class="lbl">Tema do mês</span><div class="seg" id="pTema">${Object.keys(TEMAS).map(t => `<button data-v="${t}">${TEMAS[t].nome}</button>`).join("")}</div></div>
+    <div class="field"><span class="lbl">Tema(s) do mês</span><div class="seg" id="pTema">${segTemas(temas)}</div><span class="m">Pode escolher mais do que um. Temas novos criam-se em Mais › Temas.</span></div>
     <div class="field"><label for="pFoco">Foco / objetivo</label><input type="text" id="pFoco" value="${esc(p.foco)}"></div>
     <div class="field"><span class="lbl">Sessões de cada semana</span><span class="m">Para cada semana, crie o plano (aquecimento e parte principal com exercícios da base de dados) ou escolha um que já exista.</span>
     <div class="list">${sem.map((sg, i) => { const pid = S.semanas[sg]?.planoId, pl = pid && S.planos[pid];
@@ -1050,20 +1071,26 @@ function editPlano(k, rasc) {
         ${pl ? `<span class="m">Aquecimento: ${(pl.itens || []).filter(x => parteDe(x) === "aquecimento").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}<br>Principal: ${(pl.itens || []).filter(x => parteDe(x) === "principal").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}</span>` : ""}
         <div class="actions" style="justify-content:flex-start">${pl ? `<button class="btn" data-pedit="${pid}">Editar plano</button>` : ""}<button class="btn${pl ? " ghost" : ""}" data-pnovo="${sg}" data-n="${i + 1}">Criar plano novo</button></div></div>`; }).join("")}</div></div>
     <div class="actions">${S.plano[k] ? `<button class="btn danger" id="pDel">Limpar tema</button>` : ""}<button class="btn" data-close>Fechar</button><button class="btn primary" id="pOk">Guardar tema</button></div>`);
-  const sync = () => $("#pTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tema)));
-  $("#pTema", el).addEventListener("click", e => { const b = e.target.closest("button"); if (b) { tema = b.dataset.v; sync(); } });
-  sync();
-  const voltar = () => editPlano(k, { tema, foco: $("#pFoco", el).value });
+  ligarSegTemas($("#pTema", el), temas);
+  const rascunho = () => ({ temas: temas.slice(), foco: $("#pFoco", el).value });
+  const voltar = () => editPlano(k, rascunho());
   el.querySelectorAll("[data-psem]").forEach(s2 => s2.addEventListener("change", async () => {
     const sg = s2.dataset.psem; await (s2.value ? guardar("semanas", sg, { planoId: s2.value }) : apagar("semanas", sg)).catch(() => {}); voltar();
   }));
-  el.querySelectorAll("[data-pedit]").forEach(b => b.addEventListener("click", () => { const r = { tema, foco: $("#pFoco", el).value }; formPlano(b.dataset.pedit, { depois: () => editPlano(k, r) }); }));
-  el.querySelectorAll("[data-pnovo]").forEach(b => b.addEventListener("click", () => { const r = { tema, foco: $("#pFoco", el).value };
-    formPlano(null, { semana: b.dataset.pnovo, tema, nome: `${TEMAS[tema].nome} · ${MESES[+k.slice(5) - 1].slice(0, 3)} · semana ${b.dataset.n}`, depois: () => editPlano(k, r) }); }));
+  el.querySelectorAll("[data-pedit]").forEach(b => b.addEventListener("click", () => { const r = rascunho(); formPlano(b.dataset.pedit, { depois: () => editPlano(k, r) }); }));
+  el.querySelectorAll("[data-pnovo]").forEach(b => b.addEventListener("click", () => { const r = rascunho();
+    formPlano(null, { semana: b.dataset.pnovo, temas: temas.slice(), nome: `${temas.map(nomeTema).join(" + ")} · ${MESES[+k.slice(5) - 1].slice(0, 3)} · semana ${b.dataset.n}`, depois: () => editPlano(k, r) }); }));
   $("#pOk", el).addEventListener("click", async () => {
-    try { await guardar("plano", k, { tema, foco: $("#pFoco", el).value.trim() }); fecharFolha(); toast("Tema do mês guardado"); } catch (e) {}
+    try { await guardar("plano", k, { tema: temas[0], temas: temas.slice(), foco: $("#pFoco", el).value.trim() }); fecharFolha(); toast("Tema do mês guardado"); } catch (e) {}
   });
   $("#pDel", el)?.addEventListener("click", () => { apagar("plano", k); fecharFolha(); });
+}
+function viewGerirTemas() {
+  if (!podeGerir()) return "";
+  return `<section><div class="sec-h"><h2>Temas</h2><span class="sub">${Object.keys(TEMAS).length}</span></div>
+    <span class="m">Os quatro temas base ficam sempre. Pode criar outros (ex.: Geral) e escolher mais do que um tema por mês, plano ou sessão.</span>
+    <div class="item">${Object.keys(TEMAS).map(t => `<div class="row">${chipTema(t)}${TEMAS_BASE[t] ? `<span class="m">base</span>` : `<button class="btn ghost" data-rmtema="${t}">Apagar</button>`}</div>`).join("")}
+      <div class="row"><input type="text" id="novoTema" placeholder="Novo tema (ex.: Geral)" aria-label="Nome do novo tema" style="flex:1;min-width:0"><button class="btn primary" id="addTema">Adicionar</button></div></div></section>`;
 }
 let semOffset = 0;
 function viewSemana() {
@@ -1282,6 +1309,7 @@ document.getElementById("banner").addEventListener("click", e => { if (e.target.
 
 // ---------- render e eventos ----------
 function render() {
+  atualizarTemas();
   const tabs = TABS[nivel()];
   document.querySelectorAll("nav.tabs button").forEach(b => b.hidden = !tabs.includes(b.dataset.tab));
   if (!tabs.includes(tab)) tab = tabs[0];
@@ -1327,6 +1355,20 @@ $("#view").addEventListener("click", e => {
     return;
   }
   if (e.target.id === "relImprimir") { window.print(); return; }
+  if (e.target.id === "addTema") {
+    const nome = $("#novoTema").value.trim(), id = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (!id) return toast("Escreva o nome do tema");
+    if (TEMAS[id]) return toast("Esse tema já existe");
+    const cfg = JSON.parse(JSON.stringify(S.plano.config || {})); cfg.temas = cfg.temas || {};
+    cfg.temas[id] = { nome, cor: CORES_EXTRA[Object.keys(cfg.temas).length % CORES_EXTRA.length] };
+    guardar("plano", "config", cfg).then(() => toast("Tema " + nome + " criado"), () => {}); return;
+  }
+  const rt = e.target.closest("[data-rmtema]");
+  if (rt) {
+    if (!rt.dataset.armed) { rt.dataset.armed = 1; rt.textContent = "Confirmar"; return; }
+    const cfg = JSON.parse(JSON.stringify(S.plano.config || {})); delete (cfg.temas || {})[rt.dataset.rmtema];
+    guardar("plano", "config", cfg).then(() => toast("Tema apagado"), () => {}); return;
+  }
   const tk = e.target.closest("[data-tarefa]");
   if (tk) { const [rid, i] = tk.dataset.tarefa.split("|"); const r = JSON.parse(JSON.stringify(S.reunioes[rid])); r.tarefas[+i].feito = !r.tarefas[+i].feito; guardar("reunioes", rid, r).then(() => toast(r.tarefas[+i].feito ? "Tarefa concluída" : "Tarefa reaberta"), () => {}); return; }
   if (e.target.id === "relCopiar") { const t = textoRelatorio(); try { navigator.clipboard.writeText(t).then(() => toast("Relatório copiado"), () => abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`)); } catch (err) { abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`); } return; }
