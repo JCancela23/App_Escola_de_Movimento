@@ -103,7 +103,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600 }
 .sheet h2 { font-size: 26px; text-transform: uppercase }
 .field { display: grid; gap: 6px }
 .field > label, .lbl { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
-input[type=text], input[type=date], input[type=url], input[type=number], input[type=month], input[type=tel], input[type=email], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; min-height: 44px }
+input[type=text], input[type=date], input[type=time], input[type=url], input[type=number], input[type=month], input[type=tel], input[type=email], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; min-height: 44px }
 textarea { min-height: 80px; resize: vertical }
 .seg { display: flex; flex-wrap: wrap; gap: 6px }
 .seg button { flex: 1 1 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-height: 44px; font-weight: 500 }
@@ -217,6 +217,13 @@ let avalSel = { equipaId: null, tema: "gatinhar", mes: mesKey(new Date()) };
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Hora sempre no formato HH:MM (aceita 18h30, 18.30, 1830, 9:5…)
+function horaStd(v) {
+  const m = String(v ?? "").trim().match(/^(\d{1,2})\s*(?:[:hH.,]\s*(\d{1,2})?|(\d{2}))?\s*(?:m|min)?$/);
+  if (!m) return "";
+  const h = +m[1], mi = +(m[2] ?? m[3] ?? 0);
+  return h < 24 && mi < 60 ? String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0") : "";
+}
 function hojeISO() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function mesKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
 function mesNome(k) { const [y, m] = k.split("-"); return MESES[+m - 1] + " " + y; }
@@ -339,7 +346,7 @@ function formAlteracao(equipaId, data) {
     <span class="m">${esc(e.modalidade)} ${esc(e.escalao)} · prevista para ${dataCurta(data)} às ${esc(e.hora || "")}</span>
     <div class="seg" id="aModo"><button data-v="mudar">Mudar dia, hora ou local</button><button data-v="cancelar">Não vai haver</button></div>
     <div id="aMudar" class="row"><div class="field" style="flex:1"><label for="aData">Novo dia</label><input type="date" id="aData" value="${a.novaData || data}"></div>
-      <div class="field" style="flex:1"><label for="aHora">Nova hora</label><input type="text" id="aHora" value="${esc(a.novaHora || e.hora || "")}"></div></div>
+      <div class="field" style="flex:1"><label for="aHora">Nova hora</label><input type="time" step="300" id="aHora" value="${horaStd(a.novaHora || e.hora)}"></div></div>
     <div id="aMudar2" class="row"><div class="field" style="flex:2"><label for="aLocal">Local</label><input type="text" id="aLocal" value="${esc(a.novoLocal || e.local || "")}"></div>
       <div class="field" style="flex:1"><label for="aDur">Duração (min)</label><input type="number" id="aDur" value="${a.novaDuracao || e.duracao || 20}"></div></div>
     <div id="aCanc" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="aMot">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
@@ -655,7 +662,7 @@ function formSessao(s) {
     <div class="field"><label for="fEq">Equipa</label><select id="fEq">${equipas.map(e => `<option value="${e.id}" ${e.id === f.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
     <div class="field"><label for="fPor">Preparador físico que dá a sessão</label><select id="fPor"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="fData">Data</label><input type="date" id="fData" value="${f.data}"></div>
-    <div class="row"><div class="field" style="flex:1"><label for="fHora">Hora</label><input type="text" id="fHora" value="${esc(f.hora)}" placeholder="18:30"></div>
+    <div class="row"><div class="field" style="flex:1"><label for="fHora">Hora</label><input type="time" step="300" id="fHora" value="${horaStd(f.hora)}"></div>
       <div class="field" style="flex:1"><label for="fDur">Duração (min)</label><input type="number" id="fDur" value="${f.duracao}"></div></div>
     <div class="field"><label for="fLocal">Local</label><input type="text" id="fLocal" value="${esc(f.local)}" list="locais"><datalist id="locais">${[...new Set(Object.values(S.equipas).map(x => x.local).concat(Object.values(S.sessoes).map(x => x.local)).filter(Boolean))].map(l => `<option>${esc(l)}</option>`).join("")}</datalist></div>
     <div class="field"><span class="lbl">A sessão foi dada?</span><div class="seg" id="fEstado"><button data-v="dada">Sim, foi dada</button><button data-v="nao_dada">Não foi dada</button></div></div>
@@ -1163,7 +1170,7 @@ function formReuniao(id) {
       <div class="row"><select class="tResp" aria-label="Responsável" style="flex:1"><option value="">Responsável</option>${pessoas.map(p => `<option value="${p.id}" ${p.id === t.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select><input type="date" class="tPrazo" value="${t.prazo || ""}" aria-label="Prazo" style="flex:1"></div></div>`;
   const el = abrirFolha(`<h2>${id ? "Reunião" : "Registar reunião"}</h2>
     <div class="row"><div class="field" style="flex:1"><label for="rData">Data</label><input type="date" id="rData" value="${r.data}"></div>
-      <div class="field" style="flex:1"><label for="rHora">Hora</label><input type="text" id="rHora" value="${esc(r.hora)}" placeholder="10:00"></div></div>
+      <div class="field" style="flex:1"><label for="rHora">Hora</label><input type="time" step="300" id="rHora" value="${horaStd(r.hora)}"></div></div>
     <div class="field"><span class="lbl">Tipo</span><div class="seg" id="rTipo"><button data-v="presencial">Presencial</button><button data-v="online">Online</button></div></div>
     <div class="field"><label for="rLocal" id="rLocalLbl">Local</label><input type="text" id="rLocal" value="${esc(r.local)}"></div>
     <div class="field"><span class="lbl">Participantes</span><div class="seg" id="rPart">${pessoas.map(p => `<button data-v="${p.id}" aria-pressed="${part.includes(p.id)}">${esc(p.nome)}</button>`).join("") || `<span class="m">Adicione pessoas em Mais › Pessoas.</span>`}</div></div>
@@ -1260,10 +1267,10 @@ function editEquipa(id) {
   const hor = horarioDe(e), treinadores = (e.treinadores || []).slice(), treinos = e.treinos || [];
   const linhaTr = d => { const t = treinos.find(x => x.dia === d); return `<div class="item" style="padding:8px 10px" data-tdia="${d}">
       <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" class="tOn" ${t ? "checked" : ""} style="width:22px;height:22px"><span class="t">${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][d]}</span></label>
-      <div class="row tCampos" ${t ? "" : "hidden"}><input type="text" class="tIni" value="${esc(t?.inicio || "")}" placeholder="Início" aria-label="Hora de início" style="flex:1"><input type="text" class="tFim" value="${esc(t?.fim || "")}" placeholder="Fim" aria-label="Hora de fim" style="flex:1"><input type="text" class="tLoc" value="${esc(t?.local || treinos[0]?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local do treino" style="flex:2"></div></div>`; };
+      <div class="row tCampos" style="flex-wrap:wrap" ${t ? "" : "hidden"}><input type="time" step="300" class="tIni" value="${horaStd(t?.inicio)}" aria-label="Hora de início" style="flex:none;width:7.4em;padding-inline:8px"><input type="time" step="300" class="tFim" value="${horaStd(t?.fim)}" aria-label="Hora de fim" style="flex:none;width:7.4em;padding-inline:8px"><input type="text" class="tLoc" value="${esc(t?.local || treinos[0]?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local do treino" style="flex:1 1 100%;min-width:0"></div></div>`; };
   const linha = d => { const h = hor.find(x => x.dia === d); return `<div class="item" style="padding:8px 10px" data-dia="${d}">
       <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" class="hOn" ${h ? "checked" : ""} style="width:22px;height:22px"><span class="t">${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][d]}</span></label>
-      <div class="row hCampos" ${h ? "" : "hidden"}><input type="text" class="hHora" value="${esc(h?.hora || hor[0]?.hora || "")}" placeholder="18:30" aria-label="Hora" style="flex:1"><input type="text" class="hLocal" value="${esc(h?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local" style="flex:2"><input type="number" class="hDur" value="${h?.duracao || hor[0]?.duracao || 20}" aria-label="Duração em minutos" style="flex:1"></div></div>`; };
+      <div class="row hCampos" ${h ? "" : "hidden"}><input type="time" step="300" class="hHora" value="${horaStd(h?.hora || hor[0]?.hora)}" aria-label="Hora" style="flex:none;width:7.4em;padding-inline:8px"><input type="text" class="hLocal" value="${esc(h?.local || hor[0]?.local || "")}" placeholder="Local" aria-label="Local" style="flex:2;min-width:0"><input type="number" class="hDur" value="${h?.duracao || hor[0]?.duracao || 20}" aria-label="Duração em minutos" style="flex:1;min-width:0"></div></div>`; };
   const el = abrirFolha(`<h2>${id ? "Editar escalão" : "Nova modalidade / escalão"}</h2>
     <div class="field"><label for="qMod">Modalidade</label><input type="text" id="qMod" value="${esc(e.modalidade)}" list="mods">
       <datalist id="mods"><option>Andebol</option><option>Futsal</option><option>Basquetebol</option><option>Voleibol</option><option>Hóquei em patins</option><option>Natação</option></datalist></div>
