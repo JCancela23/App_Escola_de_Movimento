@@ -1162,33 +1162,47 @@ function viewReunioes() {
   return html + `</div></section>`;
 }
 function formReuniao(id) {
-  const r = id ? JSON.parse(JSON.stringify(S.reunioes[id])) : { data: hojeISO(), hora: "", tipo: "presencial", local: "", participantes: [], objetivos: "", notas: "", tarefas: [] };
+  const novo = !id; id = id || novoId("r");
+  const r = S.reunioes[id] ? JSON.parse(JSON.stringify(S.reunioes[id])) : { data: hojeISO(), hora: "", tipo: "presencial", local: "", participantes: [], objetivos: "", notas: "", tarefas: [] };
   let tipo = r.tipo; const part = (r.participantes || []).slice();
   const pessoas = sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome));
   const linhaT = (t, i) => `<div class="item" style="padding:8px 10px" data-t="${i}">
       <div class="row"><input type="checkbox" class="tFeito" ${t.feito ? "checked" : ""} aria-label="Feita" style="width:22px;height:22px;flex:none"><input type="text" class="tTexto" value="${esc(t.texto)}" placeholder="O que há a fazer"></div>
       <div class="row"><select class="tResp" aria-label="Responsável" style="flex:1"><option value="">Responsável</option>${pessoas.map(p => `<option value="${p.id}" ${p.id === t.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select><input type="date" class="tPrazo" value="${t.prazo || ""}" aria-label="Prazo" style="flex:1"></div></div>`;
-  const el = abrirFolha(`<h2>${id ? "Reunião" : "Registar reunião"}</h2>
+  const el = abrirFolha(`<h2>${novo ? "Registar reunião" : "Reunião"}</h2><span class="m" id="rEstado">Vai sendo guardada automaticamente enquanto escreve.</span>
     <div class="row"><div class="field" style="flex:1"><label for="rData">Data</label><input type="date" id="rData" value="${r.data}"></div>
       <div class="field" style="flex:1"><label for="rHora">Hora</label><input type="time" step="300" id="rHora" value="${horaStd(r.hora)}"></div></div>
     <div class="field"><span class="lbl">Tipo</span><div class="seg" id="rTipo"><button data-v="presencial">Presencial</button><button data-v="online">Online</button></div></div>
     <div class="field"><label for="rLocal" id="rLocalLbl">Local</label><input type="text" id="rLocal" value="${esc(r.local)}"></div>
     <div class="field"><span class="lbl">Participantes</span><div class="seg" id="rPart">${pessoas.map(p => `<button data-v="${p.id}" aria-pressed="${part.includes(p.id)}">${esc(p.nome)}</button>`).join("") || `<span class="m">Adicione pessoas em Mais › Pessoas.</span>`}</div></div>
     <div class="field"><label for="rObj">Objetivos</label><textarea id="rObj" placeholder="O que se quer decidir ou preparar">${esc(r.objetivos)}</textarea></div>
-    <div class="field"><label for="rNotas">O que ficou decidido</label><textarea id="rNotas">${esc(r.notas)}</textarea></div>
+    <div class="field"><label for="rNotas">Notas da reunião (o que foi falado e decidido)</label><textarea id="rNotas" style="min-height:160px">${esc(r.notas)}</textarea></div>
     <div class="field"><span class="lbl">Tarefas para depois da reunião</span><div class="list" id="rTarefas">${(r.tarefas || []).map(linhaT).join("")}</div><button class="btn" id="rAddT">Adicionar tarefa</button></div>
-    <div class="actions">${id ? `<button class="btn danger" id="rDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rOk">Guardar</button></div>`);
+    <div class="actions">${!novo ? `<button class="btn danger" id="rDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rOk">Guardar</button></div>`);
   const sync = () => { $("#rTipo", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tipo))); $("#rLocalLbl", el).textContent = tipo === "online" ? "Plataforma ou link (Teams, Zoom…)" : "Local"; };
   $("#rTipo", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { tipo = b.dataset.v; sync(); } });
   $("#rPart", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = part.indexOf(b.dataset.v); i >= 0 ? part.splice(i, 1) : part.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
   $("#rAddT", el).addEventListener("click", () => { const box = $("#rTarefas", el); box.insertAdjacentHTML("beforeend", linhaT({}, box.children.length)); box.lastElementChild.querySelector(".tTexto").focus(); });
   sync();
+  const recolher = () => ({ data: $("#rData", el).value || hojeISO(), hora: $("#rHora", el).value.trim(), tipo, local: $("#rLocal", el).value.trim(), participantes: part.slice(), objetivos: $("#rObj", el).value.trim(), notas: $("#rNotas", el).value.trim(),
+    tarefas: [...el.querySelectorAll("[data-t]")].map(x => ({ texto: x.querySelector(".tTexto").value.trim(), responsavel: x.querySelector(".tResp").value || null, prazo: x.querySelector(".tPrazo").value || null, feito: x.querySelector(".tFeito").checked })).filter(t => t.texto), criadoEm: r.criadoEm || Date.now() });
+  // guarda sozinha enquanto se escreve (para notas tiradas durante a reunião)
+  let tAuto = null, apagada = false, ultimo = JSON.stringify(recolher());
+  const autoGuardar = async () => {
+    if (apagada) return;
+    const d = recolher(), j = JSON.stringify(d);
+    if (j === ultimo || (!d.objetivos && !d.notas && !d.tarefas.length && !d.local)) return;
+    ultimo = j; try { await guardar("reunioes", id, d); const e = $("#rEstado", el); if (e) e.textContent = "Guardado às " + new Date().toTimeString().slice(0, 5); } catch (err) {}
+  };
+  const agendar = () => { clearTimeout(tAuto); tAuto = setTimeout(autoGuardar, 1500); };
+  el.addEventListener("input", agendar); el.addEventListener("change", agendar); el.addEventListener("click", ev => { if (ev.target.closest("#rTipo, #rPart")) agendar(); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && el.isConnected) autoGuardar(); });
+  new MutationObserver((m, o) => { if (!el.isConnected) { o.disconnect(); clearTimeout(tAuto); autoGuardar(); } }).observe(document.body, { childList: true });
   $("#rOk", el).addEventListener("click", async () => {
-    const tarefas = [...el.querySelectorAll("[data-t]")].map(x => ({ texto: x.querySelector(".tTexto").value.trim(), responsavel: x.querySelector(".tResp").value || null, prazo: x.querySelector(".tPrazo").value || null, feito: x.querySelector(".tFeito").checked })).filter(t => t.texto);
-    const dados = { data: $("#rData", el).value || hojeISO(), hora: $("#rHora", el).value.trim(), tipo, local: $("#rLocal", el).value.trim(), participantes: part, objetivos: $("#rObj", el).value.trim(), notas: $("#rNotas", el).value.trim(), tarefas, criadoEm: r.criadoEm || Date.now() };
-    try { await guardar("reunioes", id || novoId("r"), dados); fecharFolha(); toast("Reunião guardada"); } catch (e) {}
+    clearTimeout(tAuto); const d = recolher(); ultimo = JSON.stringify(d);
+    try { await guardar("reunioes", id, d); fecharFolha(); toast("Reunião guardada"); } catch (e) {}
   });
-  $("#rDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("reunioes", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+  $("#rDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { clearTimeout(tAuto); apagada = true; apagar("reunioes", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
 }
 function viewPessoas() {
   if (!podeEscrever()) return "";
