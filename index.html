@@ -395,8 +395,10 @@ function abrirAtraso() {
     });
     html += `</div>`;
   }
+  if (podeEscrever()) html += `<button class="btn" id="atrasoLivre">Registar outra sessão passada (escolher equipa, dia, hora e local)</button>`;
   html += `<div class="actions"><button class="btn" data-close>Fechar</button></div>`;
   const el = abrirFolha(html);
+  $("#atrasoLivre", el)?.addEventListener("click", () => formSessao({ data: somaDias(hojeISO(), -1), depois: abrirAtraso }));
   $("#iniOk", el)?.addEventListener("click", async () => {
     try { await guardar("plano", "config", { ...(S.plano.config || {}), inicios: { ...(S.plano.config?.inicios || {}), [epocaVista()]: $("#iniEp", el).value } }); abrirAtraso(); } catch (e) {}
   });
@@ -690,6 +692,7 @@ function formSessao(s) {
     if (!s?.dadaPor) fPor.value = q.responsavel || "";
     if (!s?.id && q.modalidade) { const h = horarioNoDia(q, $("#fData", el).value || hoje); $("#fHora", el).value = h.hora || ""; $("#fLocal", el).value = h.local || ""; $("#fDur", el).value = h.duracao || 20; }
   });
+  $("#fData", el).addEventListener("change", () => $("#fEq", el).dispatchEvent(new Event("change")));
   seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); ligarSegTemas($("#fTema", el), f.temas); seg("#fMotivo", "motivo"); vis();
   el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, f.nAtletas + +b.dataset.step); $("#fN", el).textContent = f.nAtletas; }));
 
