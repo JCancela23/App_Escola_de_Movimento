@@ -173,7 +173,7 @@ a { color: var(--accent) }
 <nav class="tabs" aria-label="Secções">
   <button data-tab="mes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Este mês</button>
   <button data-tab="temas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>Planeamento</button>
-  <button data-tab="hoje" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hoje</button>
+  <button data-tab="hoje" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Semana</button>
   <button data-tab="sessoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>Sessões</button>
   <button data-tab="exercicios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>Exercícios</button>
   <button data-tab="avaliacoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Avaliações</button>
@@ -355,10 +355,12 @@ function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
   const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Dada · ${s.nAtletas}</span>` : `<span class="chip bad">Não dada</span>`)
     : p.cancelada ? `<span class="chip bad">Cancelada</span>` : p.data <= hojeISO() ? `<span class="chip warn">Por registar</span>` : "";
+  const quem = s?._por ? " · registada por " + esc(nomeDeEmail(s._por).split(" ")[0]) : "";
+  const porque = s?.estado === "nao_dada" ? `<span class="m bad">Porquê: ${esc(s.motivo || "sem motivo indicado")}</span>` : "";
   const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(p.motivo) + ")" : ""}` : p.cancelada ? ` · ${esc(p.motivo)}` : "";
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
-    <span class="m">${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(e.responsavel) ? " · " + esc(pessoaNome(e.responsavel)) : ""}${extra}</span>
+    <span class="m">${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
     ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
       ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
       ${s ? "" : `<button class="btn ghost" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">Alterar</button>`}
@@ -562,6 +564,7 @@ function textoRelatorio() {
 }
 
 // ---------- HOJE ----------
+let hojeOffset = 0;
 function viewHoje() {
   const hoje = hojeISO(), dow = new Date().getDay(), k = mesKey(new Date());
   const equipas = sorted(EQ(), (a, b) => (a.hora || "").localeCompare(b.hora || ""));
@@ -573,17 +576,23 @@ function viewHoje() {
   const pct = doMes.length ? Math.round(dadas.length / doMes.length * 100) : 0;
   const motivos = {}; nao.forEach(s => motivos[s.motivo || "Outro"] = (motivos[s.motivo || "Outro"] || 0) + 1);
 
-  const prevHoje = previstas(hoje, hoje), prox = previstas(somaDias(hoje, 1), somaDias(hoje, 7));
-  let html = `<section><div class="sec-h"><h2>Hoje</h2><span class="sub">${dataCurta(hoje)}</span></div><div class="list">`;
-  if (!prevHoje.length) html += `<div class="empty">Não há sessões previstas para hoje.</div>`;
-  prevHoje.forEach(p => html += itemPrevista(p));
+  // Semana corrente (ou outra, com ‹ ›): o que foi dado, o que não foi e porquê, e o que falta
+  const seg = somaDias(hoje, -((dow + 6) % 7) + hojeOffset * 7), dom = somaDias(seg, 6);
+  const prev = previstas(seg, dom).filter(p => !p.cancelada || !sessaoDe(p));
+  Object.entries(S.sessoes).forEach(([id, x]) => { if (x.data >= seg && x.data <= dom && EQ()[x.equipaId] && !prev.some(p => p.equipaId === x.equipaId && p.data === x.data)) prev.push({ equipaId: x.equipaId, data: x.data, hora: x.hora || "", local: x.local || "", duracao: x.duracao || 20, original: x.data }); });
+  prev.sort((x, y) => x.data.localeCompare(y.data) || (x.hora || "").localeCompare(y.hora || ""));
+  const est = prev.map(p => { const x = sessaoDe(p); return x ? x.estado : p.cancelada ? "nao_dada" : p.data <= hoje ? "porReg" : "prevista"; });
+  const n = k => est.filter(e => e === k).length;
+  let html = `<section><div class="sec-h"><h2>${hojeOffset === 0 ? "Esta semana" : hojeOffset === -1 ? "Semana passada" : hojeOffset === 1 ? "Próxima semana" : "Semana"}</h2><span class="sub">${dataCurta(seg).slice(4)} a ${dataCurta(dom).slice(4)}</span></div>
+    <div class="row"><button class="btn" data-hsem="-1" aria-label="Semana anterior">‹ Anterior</button>${hojeOffset ? `<button class="btn ghost" data-hsem="0">Esta semana</button>` : ""}<button class="btn" data-hsem="1" aria-label="Semana seguinte">Seguinte ›</button></div>
+    <div class="stats"><div class="stat"><b class="ok">${n("dada")}</b><span>Dadas</span></div><div class="stat"><b class="bad">${n("nao_dada")}</b><span>Não dadas</span></div><div class="stat"><b class="warn">${n("porReg")}</b><span>Por registar</span></div><div class="stat"><b>${n("prevista")}</b><span>Por dar</span></div></div>
+    <div class="list">`;
+  let dia = "";
+  prev.forEach(p => { if (p.data !== dia) { dia = p.data; html += `<div class="lbl" style="margin-top:6px;${p.data === hoje ? "color:var(--accent)" : ""}">${dataCurta(p.data)}${p.data === hoje ? " · hoje" : ""}</div>`; } html += itemPrevista(p); });
+  if (!prev.length) html += `<div class="empty">Sem sessões nesta semana.</div>`;
   html += `</div>`;
   if (podeEscrever()) html += `<button class="btn primary big" data-act="registar">Registar outra sessão</button>`;
-  html += `</section><section><div class="sec-h"><h2>Próximos 7 dias</h2></div><div class="list">`;
-  let dia = "";
-  prox.forEach(p => { if (p.data !== dia) { dia = p.data; html += `<div class="lbl" style="margin-top:6px">${dataCurta(p.data)}</div>`; } html += itemPrevista(p); });
-  if (!prox.length) html += `<div class="empty">Sem sessões previstas.</div>`;
-  html += `</div></section>`;
+  html += `</section>`;
 
   if (eDono()) { const ab = tarefasAbertas(); if (ab.length) html += `<section><div class="sec-h"><h2>Tarefas por fazer</h2><span class="sub">${ab.length}</span></div><div class="list">${ab.slice(0, 5).map(itemTarefa).join("")}</div></section>`; }
 
@@ -1463,6 +1472,7 @@ $("#view").addEventListener("click", e => {
     (async () => { for (const nome of nomes) { try { await guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }); } catch (err) { break; } } toast(nomes.length + " atleta(s) adicionados"); render(); })();
     return;
   }
+  const hs = e.target.closest("[data-hsem]"); if (hs) { hojeOffset = +hs.dataset.hsem === 0 ? 0 : hojeOffset + +hs.dataset.hsem; return render(); }
   const sb2 = e.target.closest("[data-sem]"); if (sb2) { semOffset += +sb2.dataset.sem; return render(); }
   if (e.target.closest("#histPor button")) { histPor = e.target.closest("button").dataset.v; histN = 30; return render(); }
   if (e.target.id === "histMais") { histN += 30; return render(); }
