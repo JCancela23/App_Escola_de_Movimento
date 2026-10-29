@@ -360,7 +360,7 @@ function itemPrevista(p) {
   const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(p.motivo) + ")" : ""}` : p.cancelada ? ` · ${esc(p.motivo)}` : "";
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
-    <span class="m">${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
+    <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>Sessão ${numeroNoMes(p.equipaId, p.data)}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
     ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
       ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
       ${s ? "" : `<button class="btn ghost" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">Alterar</button>`}
@@ -837,8 +837,20 @@ function formExercicio(e) {
 // ---------- PLANOS DE SESSÃO E MATERIAL ----------
 function segundaDe(iso) { const d = new Date(iso + "T12:00"); return somaDias(iso, -((d.getDay() + 6) % 7)); }
 // Plano de uma sessão: o escolhido para essa sessão ou, se não houver, o plano da semana
+// Sessão n do mês para o escalão: contam as anteriores do mês que não foram canceladas nem ficaram por realizar
+function fimDoMes(k) { const [y, m] = k.split("-").map(Number); return isoDe(new Date(y, m, 0)); }
+function numeroNoMes(equipaId, data) {
+  const k = data.slice(0, 7), datas = new Set();
+  previstas(k + "-01", fimDoMes(k)).forEach(p => { if (p.equipaId === equipaId && !p.cancelada) datas.add(p.data); });
+  Object.values(S.sessoes).forEach(x => { if (x.equipaId === equipaId && x.data.startsWith(k)) datas.add(x.data); });
+  return [...datas].filter(d => d < data && Object.values(S.sessoes).find(x => x.equipaId === equipaId && x.data === d)?.estado !== "nao_dada").length + 1;
+}
+function sessoesPorEquipaNoMes(k) {
+  const c = {}; previstas(k + "-01", fimDoMes(k)).forEach(p => { if (!p.cancelada) c[p.equipaId] = (c[p.equipaId] || 0) + 1; }); return c;
+}
 function planoDaSessao(equipaId, data) {
-  const id = S.planeadas[equipaId + "_" + data]?.planoId || S.semanas[segundaDe(data)]?.planoId;
+  const seq = S.plano[data.slice(0, 7)]?.sessoes || [];
+  const id = S.planeadas[equipaId + "_" + data]?.planoId || seq[numeroNoMes(equipaId, data) - 1] || S.semanas[segundaDe(data)]?.planoId;
   return id && S.planos[id] ? { id, ...S.planos[id] } : null;
 }
 const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]];
@@ -871,21 +883,15 @@ function verPlanoSessao(eid, data) {
 function viewPlanos() {
   const lista = sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome));
   let html = `<section><div class="sec-h"><h2>Planos de sessão</h2><span class="sub">${lista.length}</span></div>
-    <span class="m">Cada plano é a prescrição da sessão: aquecimento e parte principal, com exercícios da base de dados, tempo ou repetições, observações e material. Escolhe-se um plano para a semana inteira (em Mais › Plano anual, ao preparar o mês) e, se for preciso, outro para uma sessão em particular.</span>`;
+    <span class="m">Cada plano é a prescrição da sessão: aquecimento e parte principal, com exercícios da base de dados, tempo ou repetições, observações e material. Ao preparar o mês (Mais › Plano anual) escolhe-se o plano da Sessão 1, 2, 3…, e, se for preciso, outro para uma sessão em particular.</span>`;
   if (podeGerir()) {
-    html += `<button class="btn primary" data-act="novoPlano">Novo plano</button><div class="item"><span class="lbl">Plano de cada semana</span>`;
-    const seg0 = segundaDe(hojeISO());
-    for (let i = -1; i < 7; i++) {
-      const sg = somaDias(seg0, i * 7), atual = S.semanas[sg]?.planoId || "";
-      html += `<div class="row"><span class="m" style="flex:none;width:8.5em">${i === 0 ? "Esta semana" : "Semana " + dataCurta(sg).slice(4)}</span><select data-semana="${sg}" aria-label="Plano da semana de ${dataCurta(sg)}"><option value="">Sem plano</option>${lista.map(x => `<option value="${x.id}" ${x.id === atual ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>`;
-    }
-    html += `</div>`;
+    html += `<button class="btn primary" data-act="novoPlano">Novo plano</button><span class="m">A ordem das sessões de cada mês (Sessão 1, 2, 3…) escolhe-se em Mais › Plano anual, no mês.</span>`;
   }
   html += `<div class="list">`;
   lista.forEach(pl => {
-    const n = (pl.itens || []).length, nAq = (pl.itens || []).filter(i => parteDe(i) === "aquecimento").length, semanas = Object.entries(S.semanas).filter(([, w]) => w.planoId === pl.id).map(([k]) => k).sort();
+    const n = (pl.itens || []).length, nAq = (pl.itens || []).filter(i => parteDe(i) === "aquecimento").length, usos = Object.entries(S.plano).flatMap(([k, m]) => (m.sessoes || []).map((x, i) => x === pl.id ? `sessão ${i + 1} de ${MESES[+k.slice(5) - 1]}` : null)).filter(Boolean);
     html += `<button class="item" data-act="verPlano" data-id="${pl.id}"><div class="row"><span class="t">${esc(pl.nome)}</span>${chipTema(temasDe(pl))}</div>
-      <span class="m">Aquecimento ${nAq} · parte principal ${n - nAq}${(pl.material || []).length ? " · " + pl.material.length + " material" : ""}${semanas.length ? " · semana de " + semanas.map(k => dataCurta(k).slice(4)).join(", ") : ""}</span></button>`;
+      <span class="m">Aquecimento ${nAq} · parte principal ${n - nAq}${(pl.material || []).length ? " · " + pl.material.length + " material" : ""}${usos.length ? " · " + usos.join(", ") : ""}</span></button>`;
   });
   if (!lista.length) html += `<div class="empty">Ainda não há planos.${podeGerir() ? " Crie o primeiro com Novo plano." : ""}</div>`;
   return html + `</div></section>`;
@@ -931,7 +937,7 @@ function formPlano(id, op = {}) {
       <input type="text" class="iObs" value="${esc(i.obs)}" placeholder="Observações" aria-label="Observações"></div>`;
   const linhaM = m => `<div class="row" data-mat><select class="mId" aria-label="Material" style="flex:2"><option value="">Escolher material</option>${mats.map(x => `<option value="${x.id}" ${x.id === m.materialId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select><input type="text" class="mQtd" value="${esc(m.qtd)}" placeholder="Qtd." aria-label="Quantidade" style="flex:1"><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>`;
   const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
-    <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
+    <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.legenda ? `<span class="m">${esc(op.legenda)}</span>` : ""}${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
     <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="plTema">${segTemas(temas)}</div></div>
     ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("")}
     ${exs.length ? "" : `<span class="m">Ainda não há exercícios na base de dados. Adicione-os em Exercícios.</span>`}
@@ -951,6 +957,7 @@ function formPlano(id, op = {}) {
     try {
       await guardar("planos", pid, dados);
       if (op.semana) await guardar("semanas", op.semana, { planoId: pid });
+      if (op.aoCriar) await op.aoCriar(pid);
       fecharFolha(); toast("Plano guardado"); op.depois?.();
     } catch (e) {}
   });
@@ -1061,7 +1068,7 @@ function viewMais() {
     html += `<button class="item" data-act="editPlano" data-id="${k}" ${podeGerir() ? "" : "disabled"} style="${k === k0 ? "border-color:var(--accent)" : ""}">
       <div class="row"><span class="t" style="text-transform:capitalize">${mesNome(k)}</span>${p ? chipTema(temasDe(p)) : `<span class="m">Por definir</span>`}</div>
       ${p?.foco ? `<span class="m">${esc(p.foco)}</span>` : ""}
-      ${podeGerir() ? (() => { const sm = semanasDoMes(k), n = sm.filter(sg => S.planos[S.semanas[sg]?.planoId]).length; return `<span class="m">${n} de ${sm.length} semanas com plano</span>`; })() : ""}</button>`;
+      ${podeGerir() ? (() => { const n = (p?.sessoes || []).filter(x => S.planos[x]).length, mx = Math.max(0, ...Object.values(sessoesPorEquipaNoMes(k))); return `<span class="m">${n} de ${mx} sessões com plano</span>`; })() : ""}</button>`;
   });
   html += `</div></section>`;
 
@@ -1108,28 +1115,35 @@ function editPlano(k, rasc) {
   const p = rasc || S.plano[k] || { foco: "" };
   const temas = temasDe(p).slice(); if (!temas.length) temas.push("saltar");
   const planos = sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome));
-  const sem = semanasDoMes(k);
+  const porEq = sessoesPorEquipaNoMes(k), maxEq = Math.max(0, ...Object.values(porEq));
+  const seq = (S.plano[k]?.sessoes || []).slice(), nSlots = Math.max(seq.length, 1) + (rasc?.extra || 0);
+  const resumoEq = Object.entries(porEq).sort((x, y) => y[1] - x[1]).map(([id, n]) => esc(equipaNome(id)) + " " + n).join(" · ");
   const el = abrirFolha(`<h2 style="text-transform:capitalize">Preparar ${mesNome(k)}</h2>
     <div class="field"><span class="lbl">Tema(s) do mês</span><div class="seg" id="pTema">${segTemas(temas)}</div><span class="m">Pode escolher mais do que um. Temas novos criam-se em Mais › Temas.</span></div>
     <div class="field"><label for="pFoco">Foco / objetivo</label><input type="text" id="pFoco" value="${esc(p.foco)}"></div>
-    <div class="field"><span class="lbl">Sessões de cada semana</span><span class="m">Para cada semana, crie o plano (aquecimento e parte principal com exercícios da base de dados) ou escolha um que já exista.</span>
-    <div class="list">${sem.map((sg, i) => { const pid = S.semanas[sg]?.planoId, pl = pid && S.planos[pid];
-      return `<div class="item"><div class="row"><span class="t">Semana ${i + 1}</span><span class="m">${dataCurta(sg).slice(4)} a ${dataCurta(somaDias(sg, 6)).slice(4)}</span></div>
-        <select data-psem="${sg}" aria-label="Plano da semana ${i + 1}"><option value="">Sem plano</option>${planos.map(x => `<option value="${x.id}" ${x.id === pid ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select>
+    <div class="field"><span class="lbl">Sessões do mês</span><span class="m">Acrescente as sessões que o mês precisa (veja abaixo quantas tem cada escalão). Cada escalão segue esta ordem ao seu ritmo: a 1.ª sessão do mês usa a Sessão 1, a 2.ª a Sessão 2, e assim por diante. Quem tem duas sessões por semana avança mais depressa. Se uma sessão não for realizada, a seguinte fica com o mesmo plano.</span>
+    ${resumoEq ? `<span class="m">Sessões previstas neste mês: ${resumoEq}</span>` : ""}
+    <div class="list">${Array.from({ length: nSlots }, (_, i) => { const pid = seq[i], pl = pid && S.planos[pid];
+      const quem = Object.entries(porEq).filter(([, n]) => n > i).length;
+      return `<div class="item"><div class="row"><span class="t">Sessão ${i + 1}</span><span class="m">${quem ? quem + " escal" + (quem === 1 ? "ão" : "ões") : "nenhum escalão chega aqui"}</span></div>
+        <select data-pseq="${i}" aria-label="Plano da sessão ${i + 1}"><option value="">Sem plano</option>${planos.map(x => `<option value="${x.id}" ${x.id === pid ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select>
         ${pl ? `<span class="m">Aquecimento: ${(pl.itens || []).filter(x => parteDe(x) === "aquecimento").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}<br>Principal: ${(pl.itens || []).filter(x => parteDe(x) === "principal").map(x => esc(S.exercicios[x.exercicioId]?.nome || "")).filter(Boolean).join(", ") || "—"}</span>` : ""}
-        <div class="actions" style="justify-content:flex-start">${pl ? `<button class="btn" data-pedit="${pid}">Editar plano</button>` : ""}<button class="btn${pl ? " ghost" : ""}" data-pnovo="${sg}" data-n="${i + 1}">Criar plano novo</button></div></div>`; }).join("")}</div></div>
+        <div class="actions" style="justify-content:flex-start">${pl ? `<button class="btn" data-pedit="${pid}">Editar plano</button>` : ""}<button class="btn${pl ? " ghost" : ""}" data-pnovo="${i}">Criar plano novo</button></div></div>`; }).join("")}</div>
+    <div class="row"><button class="btn" id="pMaisSessao" style="flex:1">+ Mais uma sessão</button>${nSlots > 1 ? `<button class="btn ghost" id="pMenosSessao">Tirar a última</button>` : ""}</div></div>
     <div class="actions">${S.plano[k] ? `<button class="btn danger" id="pDel">Limpar tema</button>` : ""}<button class="btn" data-close>Fechar</button><button class="btn primary" id="pOk">Guardar tema</button></div>`);
   ligarSegTemas($("#pTema", el), temas);
   const rascunho = () => ({ temas: temas.slice(), foco: $("#pFoco", el).value });
-  const voltar = () => editPlano(k, rascunho());
-  el.querySelectorAll("[data-psem]").forEach(s2 => s2.addEventListener("change", async () => {
-    const sg = s2.dataset.psem; await (s2.value ? guardar("semanas", sg, { planoId: s2.value }) : apagar("semanas", sg)).catch(() => {}); voltar();
-  }));
+  const voltar = (extra = 0) => editPlano(k, { ...rascunho(), extra });
+  const guardarSeq = async (i, pid) => { const atual = (S.plano[k]?.sessoes || []).slice(); while (atual.length <= i) atual.push(null); atual[i] = pid || null; while (atual.length && !atual[atual.length - 1]) atual.pop();
+    await guardar("plano", k, { ...(S.plano[k] || { tema: temas[0], temas: temas.slice(), foco: $("#pFoco", el).value.trim() }), sessoes: atual }); };
+  el.querySelectorAll("[data-pseq]").forEach(s2 => s2.addEventListener("change", async () => { await guardarSeq(+s2.dataset.pseq, s2.value).catch(() => {}); voltar(); }));
+  $("#pMaisSessao", el).addEventListener("click", () => voltar((rasc?.extra || 0) + 1));
+  $("#pMenosSessao", el)?.addEventListener("click", async () => { if (rasc?.extra) return voltar(rasc.extra - 1); await guardarSeq(seq.length - 1, null).catch(() => {}); voltar(); });
   el.querySelectorAll("[data-pedit]").forEach(b => b.addEventListener("click", () => { const r = rascunho(); formPlano(b.dataset.pedit, { depois: () => editPlano(k, r) }); }));
-  el.querySelectorAll("[data-pnovo]").forEach(b => b.addEventListener("click", () => { const r = rascunho();
-    formPlano(null, { semana: b.dataset.pnovo, temas: temas.slice(), nome: `${temas.map(nomeTema).join(" + ")} · ${MESES[+k.slice(5) - 1].slice(0, 3)} · semana ${b.dataset.n}`, depois: () => editPlano(k, r) }); }));
+  el.querySelectorAll("[data-pnovo]").forEach(b => b.addEventListener("click", () => { const r = rascunho(), i = +b.dataset.pnovo;
+    formPlano(null, { legenda: `Fica como Sessão ${i + 1} de ${mesNome(k)}.`, aoCriar: pid => guardarSeq(i, pid), temas: temas.slice(), nome: `${temas.map(nomeTema).join(" + ")} · ${MESES[+k.slice(5) - 1].slice(0, 3)} · sessão ${i + 1}`, depois: () => editPlano(k, r) }); }));
   $("#pOk", el).addEventListener("click", async () => {
-    try { await guardar("plano", k, { tema: temas[0], temas: temas.slice(), foco: $("#pFoco", el).value.trim() }); fecharFolha(); toast("Tema do mês guardado"); } catch (e) {}
+    try { await guardar("plano", k, { ...(S.plano[k] || {}), tema: temas[0], temas: temas.slice(), foco: $("#pFoco", el).value.trim() }); fecharFolha(); toast("Tema do mês guardado"); } catch (e) {}
   });
   $("#pDel", el)?.addEventListener("click", () => { apagar("plano", k); fecharFolha(); });
 }
