@@ -1001,7 +1001,13 @@ function viewAvaliacoes() {
   const atletas = sorted(S.atletas, (a, b) => a.nome.localeCompare(b.nome)).filter(a => a.equipaId === avalSel.equipaId);
   const feitos = atletas.filter(a => atual.resultados?.[a.id]).length;
 
-  let html = `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
+  // Só se avalia um tema depois de pelo menos 2 sessões realizadas desse tema (regra do João)
+  const nTema = id => Object.values(S.sessoes).filter(x => x.equipaId === id && x.estado === "dada" && temasDe(x).includes(avalSel.tema)).length;
+  const prontas = equipas.map(e => ({ e, n: nTema(e.id) }));
+  let html = `<section><div class="sec-h"><h2>Quem pode ser avaliado</h2><span class="sub">${nomeTema(avalSel.tema)} · ${prontas.filter(x => x.n >= 2).length} de ${prontas.length}</span></div>
+    <span class="m">Só se avalia ${esc(nomeTema(avalSel.tema).toLowerCase())} depois de pelo menos 2 sessões realizadas desse tema. Conta o que está registado na app.</span>
+    <div class="item">${prontas.map(({ e, n }) => `<div class="row"><span>${esc(e.modalidade)} ${esc(e.escalao)}</span><span class="${n >= 2 ? "ok" : "m"}" style="flex:none">${n >= 2 ? `✓ pronta (${n} sessões)` : `${n} de 2 sessões`}</span></div>`).join("")}</div></section>
+    <section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
     <div class="field"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
     <div class="row" style="align-items:end"><div class="field" style="flex:1"><span class="lbl">Tema</span><div class="seg" id="aTema">${TEMAS_AVALIADOS.map(t => `<button data-v="${t}" aria-pressed="${t === avalSel.tema}">${TEMAS[t].nome}</button>`).join("")}</div></div>
     <div class="field" style="width:10.5em"><label for="aMes">Mês</label><input type="month" id="aMes" value="${avalSel.mes}" ></div></div>
