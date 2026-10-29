@@ -213,6 +213,13 @@ const FERIAS = "Feriado ou férias";
 const MOTIVOS = ["Espaço ocupado", "Treino cancelado", "Jogo da equipa sénior", "Jogo ou torneio", "Poucos atletas", "Atraso do treino", "Feriado ou férias", "Falta de preparador", "Outro"];
 const CORREU = [{ v: 1, t: "Mal" }, { v: 2, t: "Razoável" }, { v: 3, t: "Bem" }, { v: 4, t: "Muito bem" }];
 const ESCALA = { 1: "Não realiza", 2: "Com dificuldade", 3: "Realiza", 4: "Domina" };
+// Testes de avaliação (plano/config.testes); o primeiro vem do João
+const TESTES_BASE = { "saltar-agachamento": { tema: "saltar", nome: "Agachamento controlado",
+  protocolo: "O atleta deve realizar a fase de descida do agachamento de maneira controlada durante 4\", aguentar na posição mais baixa possível, idealmente joelhos são dobrados mais que 90º, mantendo as costas arqueadas quase na vertical e calcanhares no chão. Depois da ordem dada pelo treinador o atleta deve subir de maneira rápida e explosiva sem saltar. O atleta deve manter a verticalidade do tronco estendendo anca e joelhos ao mesmo tempo.",
+  niveis: ["O atleta não domina a técnica e tem fraco controlo na velocidade de execução do movimento.", "O atleta domina a técnica mas tem fraco controlo na velocidade de execução do movimento ou vice-versa.", "O atleta realiza a tarefa na perfeição."] } };
+function testes() { const t = S.plano.config?.testes; return t && Object.keys(t).length ? t : TESTES_BASE; }
+function testeDe(a) { return testes()[a.teste] || { tema: a.tema, nome: nomeTema(a.tema), niveis: Object.values(ESCALA) }; }
+const maxDe = a => testeDe(a).niveis.length || 4;
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const DIAS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
@@ -233,7 +240,7 @@ let relPeriodo = "semana", relOffset = 0;
 let db = null, demo = false;
 let role = { nivel: "view", nome: "Consulta" }; // view | write | admin
 let tab = "hoje", filtroTema = "todos", filtroEquipa = "todas";
-let avalSel = { equipaId: null, tema: "gatinhar", mes: mesKey(new Date()) };
+let avalSel = { equipaId: null, teste: null, mes: mesKey(new Date()) };
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -500,7 +507,7 @@ function calcRelatorio() {
   const tarefas = reun.flatMap(r => r.tarefas || []);
   const aval = {}; Object.values(S.avaliacoes).filter(a => a.mes >= P.de.slice(0, 7) && a.mes <= P.ate.slice(0, 7)).forEach(a => {
     const v = Object.values(a.resultados || {}).filter(Boolean); if (!v.length) return;
-    const t = nomeTema(a.tema); const x = aval[t] = aval[t] || { soma: 0, n: 0 }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
+    const t = testeDe(a).nome; const x = aval[t] = aval[t] || { soma: 0, n: 0, max: maxDe(a) }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
   return { P, linhas, dadas, nao, porReg, ferias, atletas, porMod, porPessoa, motivos, temas, modalidadesAbr, escaloes, reun, tarefas, aval };
 }
 function barras(obj, cor, total) {
@@ -524,7 +531,7 @@ function viewRelatorio() {
   </section>`;
   html += `<section><div class="sec-h"><h2>Onde está implementada</h2></div><div class="item"><span class="t">${R.modalidadesAbr.length} modalidades · ${R.escaloes} escalões</span><span class="m">${R.modalidadesAbr.map(esc).join(", ")}</span></div></section>`;
   if (Object.keys(R.temas).length) html += `<section><div class="sec-h"><h2>Temas trabalhados</h2><span class="sub">sessões realizadas</span></div><div class="item">${barras(R.temas, "var(--accent)", R.dadas.length)}</div></section>`;
-  if (Object.keys(R.aval).length) html += `<section><div class="sec-h"><h2>Avaliações</h2><span class="sub">média de 1 a 4</span></div><div class="item">${Object.entries(R.aval).map(([t, x]) => `<div class="row"><span class="m">${esc(t)} (${x.n} avaliações)</span><span class="t">${(x.soma / x.n).toFixed(1)}</span></div>`).join("")}</div></section>`;
+  if (Object.keys(R.aval).length) html += `<section><div class="sec-h"><h2>Avaliações</h2><span class="sub">média de cada teste</span></div><div class="item">${Object.entries(R.aval).map(([t, x]) => `<div class="row"><span class="m">${esc(t)} (${x.n} avaliações)</span><span class="t">${(x.soma / x.n).toFixed(1)} de ${x.max}</span></div>`).join("")}</div></section>`;
   html += `<section><div class="sec-h"><h2>Por modalidade</h2></div><div class="item" style="overflow-x:auto"><table class="tab"><thead><tr><th>Modalidade</th><th>Realizadas</th><th>Não</th><th>Média atl.</th></tr></thead><tbody>`;
   Object.entries(R.porMod).sort().forEach(([k, m]) => html += `<tr><td>${esc(k)}</td><td class="ok">${m.dadas}</td><td class="bad">${m.nao}</td><td>${m.dadas ? Math.round(m.atletas / m.dadas) : "–"}</td></tr>`);
   if (!Object.keys(R.porMod).length) html += `<tr><td colspan="4" class="m">Sem sessões neste período.</td></tr>`;
@@ -554,7 +561,7 @@ function textoRelatorio() {
   Object.entries(R.porMod).sort().forEach(([k, m]) => L.push(`• ${k}: ${m.dadas} realizadas, ${m.nao} não realizadas${m.dadas ? `, média ${Math.round(m.atletas / m.dadas)} atletas` : ""}`));
   if (podeEscrever() && R.dadas.length) { L.push("", "Quem deu:"); Object.entries(R.porPessoa).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
   if (Object.keys(R.temas).length) { L.push("", "Temas trabalhados (sessões realizadas):"); Object.entries(R.temas).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
-  if (Object.keys(R.aval).length) { L.push("", "Avaliações (média de 1 a 4):"); Object.entries(R.aval).forEach(([t, x]) => L.push(`• ${t}: ${(x.soma / x.n).toFixed(1)} (${x.n} avaliações)`)); }
+  if (Object.keys(R.aval).length) { L.push("", "Avaliações (média de cada teste):"); Object.entries(R.aval).forEach(([t, x]) => L.push(`• ${t}: ${(x.soma / x.n).toFixed(1)} de ${x.max} (${x.n} avaliações)`)); }
   if (podeGerir() && R.reun.length) {
     L.push("", `Reuniões: ${R.reun.length}` + (R.tarefas.length ? ` · tarefas concluídas ${R.tarefas.filter(t => t.feito).length} de ${R.tarefas.length}` : ""));
     R.reun.forEach(r => L.push(`• ${dataCurta(r.data)} (${r.tipo === "online" ? "online" : "presencial"})${r.objetivos ? ": " + r.objetivos.replace(/\s+/g, " ") : ""}`));
@@ -989,59 +996,83 @@ function formMaterial(id) {
 
 // ---------- AVALIAÇÕES ----------
 let avalPendente = null, avalTimer = null;
-function avalId() { return `${avalSel.equipaId}_${avalSel.tema}_${avalSel.mes}`; }
+function avalId() { return `${avalSel.equipaId}_${avalSel.teste}_${avalSel.mes}`; }
 function mesAnterior(k) { const [y, m] = k.split("-").map(Number); return mesKey(new Date(y, m - 2, 1)); }
 function viewAvaliacoes() {
-  if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa, numa escala de 1 (não realiza) a 4 (domina). Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}${viewEvolucao()}</section>`;
-  const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade));
+  if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}${viewEvolucao()}</section>`;
+  const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade)), TS = testes();
   if (!avalSel.equipaId || !S.equipas[avalSel.equipaId]) avalSel.equipaId = equipas[0]?.id;
+  if (!avalSel.teste || !TS[avalSel.teste]) avalSel.teste = Object.keys(TS)[0];
   if (!avalSel.equipaId) return `<section><div class="empty">Crie primeiro uma equipa em Mais.</div></section>`;
+  const T = TS[avalSel.teste], niv = T.niveis || [];
   const atual = avalPendente && avalPendente.id === avalId() ? avalPendente.dados : (S.avaliacoes[avalId()] || { resultados: {} });
-  const anterior = S.avaliacoes[`${avalSel.equipaId}_${avalSel.tema}_${mesAnterior(avalSel.mes)}`]?.resultados || {};
+  const anterior = S.avaliacoes[`${avalSel.equipaId}_${avalSel.teste}_${mesAnterior(avalSel.mes)}`]?.resultados || {};
   const atletas = sorted(S.atletas, (a, b) => a.nome.localeCompare(b.nome)).filter(a => a.equipaId === avalSel.equipaId);
   const feitos = atletas.filter(a => atual.resultados?.[a.id]).length;
 
   // Só se avalia um tema depois de pelo menos 2 sessões realizadas desse tema (regra do João)
-  const nTema = id => Object.values(S.sessoes).filter(x => x.equipaId === id && x.estado === "dada" && temasDe(x).includes(avalSel.tema)).length;
+  const nTema = id => Object.values(S.sessoes).filter(x => x.equipaId === id && x.estado === "dada" && temasDe(x).includes(T.tema)).length;
   const prontas = equipas.map(e => ({ e, n: nTema(e.id) }));
-  let html = `<section><div class="sec-h"><h2>Quem pode ser avaliado</h2><span class="sub">${nomeTema(avalSel.tema)} · ${prontas.filter(x => x.n >= 2).length} de ${prontas.length}</span></div>
-    <span class="m">Só se avalia ${esc(nomeTema(avalSel.tema).toLowerCase())} depois de pelo menos 2 sessões realizadas desse tema. Conta o que está registado na app.</span>
-    <div class="item">${prontas.map(({ e, n }) => `<div class="row"><span>${esc(e.modalidade)} ${esc(e.escalao)}</span><span class="${n >= 2 ? "ok" : "m"}" style="flex:none">${n >= 2 ? `✓ pronta (${n} sessões)` : `${n} de 2 sessões`}</span></div>`).join("")}</div></section>
-    <section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
-    <div class="field"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}</option>`).join("")}</select></div>
-    <div class="row" style="align-items:end"><div class="field" style="flex:1"><span class="lbl">Tema</span><div class="seg" id="aTema">${TEMAS_AVALIADOS.map(t => `<button data-v="${t}" aria-pressed="${t === avalSel.tema}">${TEMAS[t].nome}</button>`).join("")}</div></div>
-    <div class="field" style="width:10.5em"><label for="aMes">Mês</label><input type="month" id="aMes" value="${avalSel.mes}" ></div></div>
-    <p class="legend">${Object.entries(ESCALA).map(([k, v]) => `<b>${k}</b> ${v}`).join(" · ")}</p>
+  let html = `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
+    <div class="field"><span class="lbl">Teste</span><div class="seg" id="aTeste">${Object.entries(TS).map(([id, t]) => `<button data-v="${id}" aria-pressed="${id === avalSel.teste}">${esc(t.nome)}</button>`).join("")}</div>
+      ${podeGerir() ? `<div class="row" style="justify-content:flex-start"><button class="btn ghost" data-act="teste" data-id="${avalSel.teste}">Editar teste</button><button class="btn ghost" data-act="teste">Novo teste</button></div>` : ""}</div>
+    <details class="item"><summary><b>Como se faz</b> <span class="m">· tema ${esc(nomeTema(T.tema))}</span></summary><p style="margin:8px 0 0;white-space:pre-line">${esc(T.protocolo || "")}</p></details>
+    <div class="row" style="align-items:end"><div class="field" style="flex:1"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}${nTema(e.id) >= 2 ? " ✓" : ""}</option>`).join("")}</select></div>
+      <div class="field" style="width:10.5em"><label for="aMes">Mês</label><input type="month" id="aMes" value="${avalSel.mes}" ></div></div>
+    ${(() => { const n = nTema(avalSel.equipaId); return n >= 2 ? `<span class="m ok">✓ Pronta para avaliar: ${n} sessões de ${esc(nomeTema(T.tema))} realizadas.</span>` : `<span class="m warn">Ainda só tem ${n} de 2 sessões de ${esc(nomeTema(T.tema))} registadas como realizadas.</span>`; })()}
+    <ol class="legend" style="margin:0;padding-left:1.4em">${niv.map(d => `<li>${esc(d)}</li>`).join("")}</ol>
     <div class="list">`;
-  if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Adicione-os abaixo (um nome por linha).</div>`;
+  if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Escreva o nome abaixo e toque em Adicionar.</div>`;
   atletas.forEach(a => {
     const v = atual.resultados?.[a.id], p = anterior[a.id];
     html += `<div class="item aval"><div class="who"><span class="t">${esc(a.nome)}</span><span class="prev">${p ? `mês anterior: ${p}` : ""}</span></div>
-      <div class="scale" data-atleta="${a.id}">${[1, 2, 3, 4].map(n => `<button data-n="${n}" aria-pressed="${v === n}" aria-label="${ESCALA[n]}">${n}</button>`).join("")}</div></div>`;
+      <div class="scale" data-atleta="${a.id}">${niv.map((d, i) => `<button data-n="${i + 1}" aria-pressed="${v === i + 1}" aria-label="${i + 1}: ${esc(d)}" title="${esc(d)}">${i + 1}</button>`).join("")}</div></div>`;
   });
   html += `</div>
+    <div class="row"><input type="text" id="aNovo1" placeholder="Atleta que não está na lista" aria-label="Nome do atleta a adicionar" style="flex:1;min-width:0"><button class="btn primary" id="aAdd1">Adicionar</button></div>
     <div class="field"><label for="aObs">Observações da avaliação</label><textarea id="aObs">${esc(atual.obs)}</textarea></div>
-    <details ${atletas.length ? "" : "open"}><summary class="btn ghost" style="display:inline-block">Adicionar atletas</summary>
+    <details><summary class="btn ghost" style="display:inline-block">Colar vários nomes de uma vez</summary>
       <div class="field" style="margin-top:8px"><textarea id="aNovos" placeholder="Um nome por linha"></textarea><button class="btn" id="aAdd">Adicionar à equipa</button></div></details>
-  </section>`;
+  </section>
+  <section><div class="sec-h"><h2>Quem pode ser avaliado</h2><span class="sub">${esc(nomeTema(T.tema))} · ${prontas.filter(x => x.n >= 2).length} de ${prontas.length}</span></div>
+    <span class="m">Só se avalia depois de pelo menos 2 sessões realizadas do tema. Conta o que está registado na app.</span>
+    <div class="item">${prontas.map(({ e, n }) => `<div class="row"><span>${esc(e.modalidade)} ${esc(e.escalao)}</span><span class="${n >= 2 ? "ok" : "m"}" style="flex:none">${n >= 2 ? `✓ pronta (${n} sessões)` : `${n} de 2 sessões`}</span></div>`).join("")}</div></section>`;
   return html + viewEvolucao();
+}
+function formTeste(id) {
+  const t = id ? JSON.parse(JSON.stringify(testes()[id])) : { tema: TEMAS_AVALIADOS[0], nome: "", protocolo: "", niveis: ["", "", ""] };
+  const el = abrirFolha(`<h2>${id ? "Editar teste" : "Novo teste"}</h2>
+    <div class="field"><label for="tNome">Nome do teste</label><input type="text" id="tNome" value="${esc(t.nome)}" placeholder="Ex.: Agachamento controlado"></div>
+    <div class="field"><label for="tTema">Tema</label><select id="tTema">${Object.keys(TEMAS).map(k => `<option value="${k}" ${k === t.tema ? "selected" : ""}>${esc(TEMAS[k].nome)}</option>`).join("")}</select></div>
+    <div class="field"><label for="tProt">Como se faz</label><textarea id="tProt" style="min-height:120px">${esc(t.protocolo)}</textarea></div>
+    <div class="field"><label for="tNiv">Classificação (uma linha por nível, do 1 para cima)</label><textarea id="tNiv" style="min-height:110px">${esc((t.niveis || []).join("\n"))}</textarea></div>
+    <div class="actions">${id && Object.keys(testes()).length > 1 ? `<button class="btn danger" id="tDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="tOk">Guardar</button></div>`);
+  const gravar = async mudar => { const cfg = JSON.parse(JSON.stringify(S.plano.config || {})); cfg.testes = JSON.parse(JSON.stringify(testes())); mudar(cfg.testes); await guardar("plano", "config", cfg); };
+  $("#tOk", el).addEventListener("click", async () => {
+    const nome = $("#tNome", el).value.trim(), niveis = $("#tNiv", el).value.split("\n").map(x => x.trim()).filter(Boolean);
+    if (!nome) return toast("Dê um nome ao teste"); if (niveis.length < 2) return toast("Escreva pelo menos 2 níveis");
+    const tid = id || novoId("t");
+    try { await gravar(ts => { ts[tid] = { tema: $("#tTema", el).value, nome, protocolo: $("#tProt", el).value.trim(), niveis }; }); avalSel.teste = tid; fecharFolha(); toast("Teste guardado"); render(); } catch (e) {}
+  });
+  $("#tDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; return; }
+    gravar(ts => { delete ts[id]; }).then(() => { avalSel.teste = null; fecharFolha(); render(); }, () => {}); });
 }
 function viewEvolucao() {
   // médias por equipa e mês (agregado, sem nomes)
   const linhas = {};
   Object.entries(S.avaliacoes).forEach(([id, a]) => {
     const vals = Object.values(a.resultados || {}).filter(Boolean); if (!vals.length || !EQ()[a.equipaId]) return;
-    const key = a.equipaId + "|" + a.tema;
-    (linhas[key] = linhas[key] || []).push({ mes: a.mes, media: vals.reduce((x, y) => x + y, 0) / vals.length, n: vals.length });
+    const key = a.equipaId + "|" + (a.teste || a.tema);
+    (linhas[key] = linhas[key] || []).push({ mes: a.mes, media: vals.reduce((x, y) => x + y, 0) / vals.length, n: vals.length, max: maxDe(a), tema: testeDe(a).tema, nome: testeDe(a).nome });
   });
   const keys = Object.keys(linhas);
   if (!keys.length) return "";
-  let html = `<section><div class="sec-h"><h2>Evolução por equipa</h2><span class="sub">média 1 a 4</span></div><div class="list">`;
+  let html = `<section><div class="sec-h"><h2>Evolução por equipa</h2><span class="sub">média de cada teste</span></div><div class="list">`;
   keys.sort().forEach(k => {
-    const [eq, tema] = k.split("|");
-    html += `<div class="item"><div class="row"><span class="t">${esc(equipaNome(eq))}</span>${chipTema(tema)}</div>`;
+    const [eq] = k.split("|"), l0 = linhas[k][0], tema = l0.tema;
+    html += `<div class="item"><div class="row"><span class="t">${esc(equipaNome(eq))}</span>${chipTema(tema)}</div><span class="m">${esc(l0.nome)} · de 1 a ${l0.max}</span>`;
     linhas[k].sort((a, b) => a.mes.localeCompare(b.mes)).forEach(l => {
-      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / 4 * 100}%;background:${corTema(tema)}"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
+      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / l.max * 100}%;background:${corTema(tema)}"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
     });
     html += `</div>`;
   });
@@ -1051,7 +1082,7 @@ function guardarAval(alterar) {
   const id = avalId();
   if (!avalPendente || avalPendente.id !== id) {
     const base = S.avaliacoes[id] || {};
-    avalPendente = { id, dados: { equipaId: avalSel.equipaId, tema: avalSel.tema, mes: avalSel.mes, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
+    avalPendente = { id, dados: { equipaId: avalSel.equipaId, teste: avalSel.teste, tema: testes()[avalSel.teste]?.tema, mes: avalSel.mes, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
   }
   alterar(avalPendente.dados);
   clearTimeout(avalTimer);
@@ -1487,7 +1518,12 @@ $("#view").addEventListener("click", e => {
     sc.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === v)));
     return;
   }
-  if (e.target.closest("#aTema button")) { avalSel.tema = e.target.closest("button").dataset.v; return render(); }
+  if (e.target.closest("#aTeste button")) { avalSel.teste = e.target.closest("button").dataset.v; return render(); }
+  if (e.target.id === "aAdd1") {
+    const nome = $("#aNovo1").value.trim(); if (!nome) return toast("Escreva o nome do atleta");
+    guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }).then(() => { toast(nome + " adicionado"); render(); setTimeout(() => $("#aNovo1")?.focus(), 50); }, () => {});
+    return;
+  }
   if (e.target.id === "aAdd") {
     const nomes = $("#aNovos").value.split("\n").map(s => s.trim()).filter(Boolean);
     (async () => { for (const nome of nomes) { try { await guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }); } catch (err) { break; } } toast(nomes.length + " atleta(s) adicionados"); render(); })();
@@ -1561,7 +1597,7 @@ $("#view").addEventListener("click", e => {
     registarPrev: () => { const pv = previstas(a.dataset.data, a.dataset.data).find(x => x.equipaId === id) || {}; formSessao({ equipaId: id, data: a.dataset.data, hora: pv.hora, local: pv.local, duracao: pv.duracao }); },
     alterar: () => formAlteracao(id, a.dataset.data),
     registar: () => formSessao(id && S.equipas[id] ? { equipaId: id } : null),
-    verSessao: () => verSessao(id), verExercicio: () => verExercicio(id), novoExercicio: () => formExercicio(),
+    verSessao: () => verSessao(id), verExercicio: () => verExercicio(id), novoExercicio: () => formExercicio(), teste: () => formTeste(id),
     editPlano: () => editPlano(id), editEquipa: () => editEquipa(id), verPessoa: () => verPessoa(id), editPessoa: () => editPessoa(id)
   })[a.dataset.act]?.();
 });
