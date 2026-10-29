@@ -124,7 +124,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600 }
 .field { display: grid; gap: 6px }
 .field > label, .lbl { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
 input[type=text], input[type=date], input[type=time], input[type=url], input[type=number], input[type=month], input[type=tel], input[type=email], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; min-height: 44px }
-textarea { min-height: 80px; resize: vertical }
+textarea { min-height: 80px; resize: vertical; overflow: hidden }
+textarea.iObs { min-height: 44px }
 .seg { display: flex; flex-wrap: wrap; gap: 6px }
 .seg button { flex: 1 1 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-height: 44px; font-weight: 500 }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600 }
@@ -924,7 +925,7 @@ function linhaItem(i, tema) {
   return `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
     <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optExercicios(i.exercicioId, tema)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
     <input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições">
-    <input type="text" class="iObs" value="${esc(i.obs)}" placeholder="Observações" aria-label="Observações"></div>`;
+    <textarea class="iObs" rows="1" placeholder="Observações" aria-label="Observações">${esc(i.obs)}</textarea></div>`;
 }
 function editorItens(itens, tema) {
   return PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="ed_${k}">${(itens || []).filter(i => parteDe(i) === k).map(i => linhaItem(i, tema)).join("")}</div><button class="btn" data-edadd="${k}">+ Exercício no ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("");
@@ -946,7 +947,7 @@ function formPlano(id, op = {}) {
   const linhaI = i => `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
       <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optEx(i.exercicioId)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
       <div class="row"><input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições"></div>
-      <input type="text" class="iObs" value="${esc(i.obs)}" placeholder="Observações" aria-label="Observações"></div>`;
+      <textarea class="iObs" rows="1" placeholder="Observações" aria-label="Observações">${esc(i.obs)}</textarea></div>`;
   const linhaM = m => `<div class="row" data-mat><select class="mId" aria-label="Material" style="flex:2"><option value="">Escolher material</option>${mats.map(x => `<option value="${x.id}" ${x.id === m.materialId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select><input type="text" class="mQtd" value="${esc(m.qtd)}" placeholder="Qtd." aria-label="Quantidade" style="flex:1"><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>`;
   const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
     <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.legenda ? `<span class="m">${esc(op.legenda)}</span>` : ""}${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
@@ -1516,12 +1517,16 @@ function editEquipa(id) {
 }
 
 // ---------- folha ----------
+// as caixas de texto crescem para baixo à medida que se escreve, para se ver tudo
+function crescer(t) { if (!t.isConnected) return; t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") crescer(e.target); });
 function abrirFolha(html) {
   fecharFolha();
   const bg = document.createElement("div"); bg.className = "sheet-bg"; bg.id = "sheet";
   bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
   bg.addEventListener("click", e => { if (e.target === bg || e.target.closest("[data-close]")) fecharFolha(); });
   document.body.appendChild(bg);
+  requestAnimationFrame(() => bg.querySelectorAll("textarea").forEach(crescer));
   return bg;
 }
 function fecharFolha() { $("#sheet")?.remove(); }
@@ -1538,6 +1543,7 @@ function render() {
   renderHeader();
   const v = { mes: viewMes, temas: viewTemas, relatorio: viewRelatorio, hoje: viewHoje, sessoes: viewSessoes, exercicios: viewExercicios, avaliacoes: viewAvaliacoes, mais: viewMais }[tab];
   $("#view").innerHTML = v();
+  requestAnimationFrame(() => document.querySelectorAll("#view textarea").forEach(crescer));
   document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
 }
 function irPara(t) { tab = t; try { localStorage.setItem("em_tab", t); } catch (e) {} render(); scrollTo(0, 0); }
