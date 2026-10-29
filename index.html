@@ -138,6 +138,8 @@ textarea { min-height: 80px; resize: vertical }
 .aval { display: grid; gap: 6px }
 .aval .who { display: flex; justify-content: space-between; gap: 8px }
 .aval .prev { font-size: 12px; color: var(--muted) }
+.dist { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--line); gap: 2px }
+.dist i { display: grid; place-items: center; font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--fg); min-width: 0; overflow: hidden }
 .scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
 .scale button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-height: 44px; font-family: var(--display); font-size: 20px; cursor: pointer }
 .scale button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
@@ -214,9 +216,12 @@ const MOTIVOS = ["Espaço ocupado", "Treino cancelado", "Jogo da equipa sénior"
 const CORREU = [{ v: 1, t: "Mal" }, { v: 2, t: "Razoável" }, { v: 3, t: "Bem" }, { v: 4, t: "Muito bem" }];
 const ESCALA = { 1: "Não realiza", 2: "Com dificuldade", 3: "Realiza", 4: "Domina" };
 // Testes de avaliação (plano/config.testes); o primeiro vem do João
-const TESTES_BASE = { "saltar-agachamento": { tema: "saltar", nome: "Agachamento controlado",
+const TESTES_BASE = { "saltar-agachamento": { tema: "saltar", nome: "Saltar", exercicio: "Agachamento controlado",
   protocolo: "O atleta deve realizar a fase de descida do agachamento de maneira controlada durante 4\", aguentar na posição mais baixa possível, idealmente joelhos são dobrados mais que 90º, mantendo as costas arqueadas quase na vertical e calcanhares no chão. Depois da ordem dada pelo treinador o atleta deve subir de maneira rápida e explosiva sem saltar. O atleta deve manter a verticalidade do tronco estendendo anca e joelhos ao mesmo tempo.",
-  niveis: ["O atleta não domina a técnica e tem fraco controlo na velocidade de execução do movimento.", "O atleta domina a técnica mas tem fraco controlo na velocidade de execução do movimento ou vice-versa.", "O atleta realiza a tarefa na perfeição."] } };
+  niveis: ["O atleta não domina a técnica e tem fraco controlo na velocidade de execução do movimento.", "O atleta domina a técnica mas tem fraco controlo na velocidade de execução do movimento ou vice-versa.", "O atleta realiza a tarefa na perfeição."] },
+  "gatinhar-objeto": { tema: "gatinhar", nome: "Gatinhar", exercicio: "Locomoção: gatinhar com objeto na lombar",
+  protocolo: "O atleta deve conseguir deslocar-se segundo o padrão de gatinhar (contralateral) durante uma distância de 3 metros sem deixar cair o objeto. O atleta pode repetir a tarefa uma vez.",
+  niveis: ["O atleta não consegue concluir a tarefa.", "O atleta consegue realizar a tarefa com êxito."] } };
 function testes() { const t = S.plano.config?.testes; return t && Object.keys(t).length ? t : TESTES_BASE; }
 function testeDe(a) { return testes()[a.teste] || { tema: a.tema, nome: nomeTema(a.tema), niveis: Object.values(ESCALA) }; }
 const maxDe = a => testeDe(a).niveis.length || 4;
@@ -240,7 +245,7 @@ let relPeriodo = "semana", relOffset = 0;
 let db = null, demo = false;
 let role = { nivel: "view", nome: "Consulta" }; // view | write | admin
 let tab = "hoje", filtroTema = "todos", filtroEquipa = "todas";
-let avalSel = { equipaId: null, teste: null, mes: mesKey(new Date()) };
+let avalSel = { equipaId: null, teste: null, data: hojeISO(), get mes() { return this.data.slice(0, 7); } };
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -999,7 +1004,7 @@ let avalPendente = null, avalTimer = null;
 function avalId() { return `${avalSel.equipaId}_${avalSel.teste}_${avalSel.mes}`; }
 function mesAnterior(k) { const [y, m] = k.split("-").map(Number); return mesKey(new Date(y, m - 2, 1)); }
 function viewAvaliacoes() {
-  if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}${viewEvolucao()}</section>`;
+  if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}</section>${viewMetricas()}${viewEvolucao()}`;
   const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade)), TS = testes();
   if (!avalSel.equipaId || !S.equipas[avalSel.equipaId]) avalSel.equipaId = equipas[0]?.id;
   if (!avalSel.teste || !TS[avalSel.teste]) avalSel.teste = Object.keys(TS)[0];
@@ -1014,19 +1019,19 @@ function viewAvaliacoes() {
   const nTema = id => Object.values(S.sessoes).filter(x => x.equipaId === id && x.estado === "dada" && temasDe(x).includes(T.tema)).length;
   const prontas = equipas.map(e => ({ e, n: nTema(e.id) }));
   let html = `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
-    <div class="field"><span class="lbl">Teste</span><div class="seg" id="aTeste">${Object.entries(TS).map(([id, t]) => `<button data-v="${id}" aria-pressed="${id === avalSel.teste}">${esc(t.nome)}</button>`).join("")}</div>
+    <div class="field"><span class="lbl">Teste</span><div class="seg" id="aTeste">${Object.entries(TS).map(([id, t]) => `<button data-v="${id}" aria-pressed="${id === avalSel.teste}">${esc(t.nome)}</button>`).join("")}</div>${T.exercicio ? `<span class="t">${esc(T.exercicio)}</span>` : ""}
       ${podeGerir() ? `<div class="row" style="justify-content:flex-start"><button class="btn ghost" data-act="teste" data-id="${avalSel.teste}">Editar teste</button><button class="btn ghost" data-act="teste">Novo teste</button></div>` : ""}</div>
     <details class="item"><summary><b>Como se faz</b> <span class="m">· tema ${esc(nomeTema(T.tema))}</span></summary><p style="margin:8px 0 0;white-space:pre-line">${esc(T.protocolo || "")}</p></details>
     <div class="row" style="align-items:end"><div class="field" style="flex:1"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}${nTema(e.id) >= 2 ? " ✓" : ""}</option>`).join("")}</select></div>
-      <div class="field" style="width:10.5em"><label for="aMes">Mês</label><input type="month" id="aMes" value="${avalSel.mes}" ></div></div>
+      <div class="field" style="width:10.5em"><label for="aData">Dia da avaliação</label><input type="date" id="aData" value="${avalSel.data}"></div></div>
     ${(() => { const n = nTema(avalSel.equipaId); return n >= 2 ? `<span class="m ok">✓ Pronta para avaliar: ${n} sessões de ${esc(nomeTema(T.tema))} realizadas.</span>` : `<span class="m warn">Ainda só tem ${n} de 2 sessões de ${esc(nomeTema(T.tema))} registadas como realizadas.</span>`; })()}
     <ol class="legend" style="margin:0;padding-left:1.4em">${niv.map(d => `<li>${esc(d)}</li>`).join("")}</ol>
     <div class="list">`;
   if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Escreva o nome abaixo e toque em Adicionar.</div>`;
   atletas.forEach(a => {
     const v = atual.resultados?.[a.id], p = anterior[a.id];
-    html += `<div class="item aval"><div class="who"><span class="t">${esc(a.nome)}</span><span class="prev">${p ? `mês anterior: ${p}` : ""}</span></div>
-      <div class="scale" data-atleta="${a.id}">${niv.map((d, i) => `<button data-n="${i + 1}" aria-pressed="${v === i + 1}" aria-label="${i + 1}: ${esc(d)}" title="${esc(d)}">${i + 1}</button>`).join("")}</div></div>`;
+    html += `<div class="item aval"><div class="who"><span class="t">${esc(a.nome)}</span><span class="prev">${atual.datas?.[a.id] && atual.datas[a.id] !== avalSel.data ? `avaliado a ${dataCurta(atual.datas[a.id]).slice(4)}` : ""}${p ? ` · mês anterior: ${p}` : ""}</span></div>
+      <div class="scale" data-atleta="${a.id}" style="grid-template-columns:repeat(${Math.max(niv.length, 2)},1fr)">${niv.map((d, i) => `<button data-n="${i + 1}" aria-pressed="${v === i + 1}" aria-label="${i + 1}: ${esc(d)}" title="${esc(d)}">${i + 1}</button>`).join("")}</div></div>`;
   });
   html += `</div>
     <div class="row"><input type="text" id="aNovo1" placeholder="Atleta que não está na lista" aria-label="Nome do atleta a adicionar" style="flex:1;min-width:0"><button class="btn primary" id="aAdd1">Adicionar</button></div>
@@ -1037,12 +1042,13 @@ function viewAvaliacoes() {
   <section><div class="sec-h"><h2>Quem pode ser avaliado</h2><span class="sub">${esc(nomeTema(T.tema))} · ${prontas.filter(x => x.n >= 2).length} de ${prontas.length}</span></div>
     <span class="m">Só se avalia depois de pelo menos 2 sessões realizadas do tema. Conta o que está registado na app.</span>
     <div class="item">${prontas.map(({ e, n }) => `<div class="row"><span>${esc(e.modalidade)} ${esc(e.escalao)}</span><span class="${n >= 2 ? "ok" : "m"}" style="flex:none">${n >= 2 ? `✓ pronta (${n} sessões)` : `${n} de 2 sessões`}</span></div>`).join("")}</div></section>`;
-  return html + viewEvolucao();
+  return html + viewMetricas() + viewEvolucao();
 }
 function formTeste(id) {
   const t = id ? JSON.parse(JSON.stringify(testes()[id])) : { tema: TEMAS_AVALIADOS[0], nome: "", protocolo: "", niveis: ["", "", ""] };
   const el = abrirFolha(`<h2>${id ? "Editar teste" : "Novo teste"}</h2>
-    <div class="field"><label for="tNome">Nome do teste</label><input type="text" id="tNome" value="${esc(t.nome)}" placeholder="Ex.: Agachamento controlado"></div>
+    <div class="field"><label for="tNome">Nome do teste</label><input type="text" id="tNome" value="${esc(t.nome)}" placeholder="Ex.: Saltar"></div>
+    <div class="field"><label for="tEx">Exercício</label><input type="text" id="tEx" value="${esc(t.exercicio || "")}" placeholder="Ex.: Agachamento controlado"></div>
     <div class="field"><label for="tTema">Tema</label><select id="tTema">${Object.keys(TEMAS).map(k => `<option value="${k}" ${k === t.tema ? "selected" : ""}>${esc(TEMAS[k].nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="tProt">Como se faz</label><textarea id="tProt" style="min-height:120px">${esc(t.protocolo)}</textarea></div>
     <div class="field"><label for="tNiv">Classificação (uma linha por nível, do 1 para cima)</label><textarea id="tNiv" style="min-height:110px">${esc((t.niveis || []).join("\n"))}</textarea></div>
@@ -1052,10 +1058,41 @@ function formTeste(id) {
     const nome = $("#tNome", el).value.trim(), niveis = $("#tNiv", el).value.split("\n").map(x => x.trim()).filter(Boolean);
     if (!nome) return toast("Dê um nome ao teste"); if (niveis.length < 2) return toast("Escreva pelo menos 2 níveis");
     const tid = id || novoId("t");
-    try { await gravar(ts => { ts[tid] = { tema: $("#tTema", el).value, nome, protocolo: $("#tProt", el).value.trim(), niveis }; }); avalSel.teste = tid; fecharFolha(); toast("Teste guardado"); render(); } catch (e) {}
+    try { await gravar(ts => { ts[tid] = { tema: $("#tTema", el).value, nome, exercicio: $("#tEx", el).value.trim(), protocolo: $("#tProt", el).value.trim(), niveis }; }); avalSel.teste = tid; fecharFolha(); toast("Teste guardado"); render(); } catch (e) {}
   });
   $("#tDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; return; }
     gravar(ts => { delete ts[id]; }).then(() => { avalSel.teste = null; fecharFolha(); render(); }, () => {}); });
+}
+// Resultados: última nota de cada atleta em cada teste, geral e por modalidade (sem nomes)
+function metricasAval() {
+  const out = {};
+  Object.values(S.avaliacoes).forEach(a => {
+    const eq = EQ()[a.equipaId]; if (!eq || !a.teste) return;
+    Object.entries(a.resultados || {}).forEach(([aid, v]) => { if (!v) return;
+      const t = out[a.teste] = out[a.teste] || {}, d = a.datas?.[aid] || a.data || a.mes + "-01", velho = t[aid];
+      if (!velho || d >= velho.d) t[aid] = { v, d, mod: eq.modalidade, eq: a.equipaId }; });
+  });
+  return out;
+}
+function viewMetricas() {
+  const M = metricasAval(), TS = testes(); if (!Object.keys(M).length) return "";
+  const linha = (nome, l, max) => {
+    const n = l.length, media = l.reduce((x, y) => x + y.v, 0) / n, dist = Array.from({ length: max }, (_, i) => l.filter(x => x.v === i + 1).length);
+    const ds = l.map(x => x.d).sort(), quando = ds[0] === ds[ds.length - 1] ? dataCurta(ds[0]).slice(4) : dataCurta(ds[0]).slice(4) + " a " + dataCurta(ds[ds.length - 1]).slice(4);
+    return `<div class="row"><span class="t">${esc(nome)}</span><span class="m" style="flex:none">${n} atleta${n === 1 ? "" : "s"} · média ${media.toFixed(1).replace(".", ",")} de ${max}</span></div>
+      <div class="dist" role="img" aria-label="${dist.map((c, i) => `nível ${i + 1}: ${Math.round(c / n * 100)}%`).join(", ")}">${dist.map((c, i) => c ? `<i style="flex:${c};background:color-mix(in srgb, var(--accent) ${Math.round(25 + 75 * i / Math.max(1, max - 1))}%, var(--line));color:${i >= (max - 1) / 2 && max > 1 ? "var(--accent-fg)" : "var(--fg)"}">${Math.round(c / n * 100)}%</i>` : "").join("")}</div>
+      <span class="m">${Math.round(dist[max - 1] / n * 100)}% no nível máximo · avaliado${n === 1 ? "" : "s"} ${quando}</span>`;
+  };
+  let html = `<section><div class="sec-h"><h2>Resultados</h2><span class="sub">última avaliação de cada atleta</span></div><div class="list">`;
+  Object.entries(M).forEach(([tid, porAt]) => {
+    const T = TS[tid] || { nome: tid, niveis: [1, 2, 3] }, max = T.niveis.length, l = Object.values(porAt);
+    const mods = [...new Set(l.map(x => x.mod))].sort();
+    html += `<div class="item"><div class="row"><span class="t" style="font-size:18px">${esc(T.nome)}</span>${chipTema(T.tema)}</div>${T.exercicio ? `<span class="m">${esc(T.exercicio)}</span>` : ""}
+      <span class="lbl" style="margin-top:6px">Geral</span>${linha("Todas as modalidades", l, max)}
+      <span class="lbl" style="margin-top:8px">Por modalidade</span>${mods.map(m => linha(m, l.filter(x => x.mod === m), max)).join("")}
+      <span class="m" style="margin-top:4px">Legenda: ${T.niveis.map((d, i) => `<b>${i + 1}</b> ${esc(String(d))}`).join(" ")}</span></div>`;
+  });
+  return html + `</div></section>`;
 }
 function viewEvolucao() {
   // médias por equipa e mês (agregado, sem nomes)
@@ -1082,7 +1119,7 @@ function guardarAval(alterar) {
   const id = avalId();
   if (!avalPendente || avalPendente.id !== id) {
     const base = S.avaliacoes[id] || {};
-    avalPendente = { id, dados: { equipaId: avalSel.equipaId, teste: avalSel.teste, tema: testes()[avalSel.teste]?.tema, mes: avalSel.mes, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
+    avalPendente = { id, dados: { equipaId: avalSel.equipaId, teste: avalSel.teste, tema: testes()[avalSel.teste]?.tema, mes: avalSel.mes, datas: { ...(base.datas || {}) }, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
   }
   alterar(avalPendente.dados);
   clearTimeout(avalTimer);
@@ -1513,7 +1550,7 @@ $("#view").addEventListener("click", e => {
   const sc = e.target.closest(".scale button");
   if (sc) {
     const aid = sc.parentElement.dataset.atleta, n = +sc.dataset.n;
-    guardarAval(d => { d.resultados[aid] = d.resultados[aid] === n ? null : n; });
+    guardarAval(d => { d.resultados[aid] = d.resultados[aid] === n ? null : n; d.datas = d.datas || {}; if (d.resultados[aid]) d.datas[aid] = avalSel.data; else delete d.datas[aid]; d.data = avalSel.data; });
     const v = avalPendente.dados.resultados[aid];
     sc.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === v)));
     return;
@@ -1604,7 +1641,7 @@ $("#view").addEventListener("click", e => {
 $("#view").addEventListener("change", e => {
   if (e.target.dataset.semana) { const sg = e.target.dataset.semana, v = e.target.value; (v ? guardar("semanas", sg, { planoId: v }) : apagar("semanas", sg)).then(() => toast("Plano da semana guardado"), () => {}); return; }
   if (e.target.id === "aEq") { avalSel.equipaId = e.target.value; render(); }
-  if (e.target.id === "aMes" && e.target.value) { avalSel.mes = e.target.value; render(); }
+  if (e.target.id === "aData" && e.target.value) { avalSel.data = e.target.value; render(); }
 });
 $("#view").addEventListener("input", e => { if (e.target.id === "aObs") { const v = e.target.value; guardarAval(d => { d.obs = v; }); } });
 
