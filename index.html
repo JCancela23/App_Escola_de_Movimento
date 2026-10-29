@@ -213,6 +213,8 @@ function ligarSegTemas(box, sel) {
 }
 const TEMAS_AVALIADOS = ["gatinhar", "saltar"];
 const FERIAS = "Feriado ou férias";
+// "Outro" obriga a explicar (motivoDetalhe)
+const motivoTxt = x => !x ? "" : x.motivo === "Outro" && x.motivoDetalhe ? "Outro: " + x.motivoDetalhe : (x.motivo || "");
 const MOTIVOS = ["Espaço ocupado", "Treino cancelado", "Jogo da equipa sénior", "Jogo ou torneio", "Poucos atletas", "Atraso do treino", "Feriado ou férias", "Falta de preparador", "Outro"];
 const CORREU = [{ v: 1, t: "Mal" }, { v: 2, t: "Razoável" }, { v: 3, t: "Bem" }, { v: 4, t: "Muito bem" }];
 const ESCALA = { 1: "Não realiza", 2: "Com dificuldade", 3: "Realiza", 4: "Domina" };
@@ -356,7 +358,7 @@ function previstas(de, ate) {
       if (!h) return;
       const alt = S.alteracoes[eid + "_" + d];
       if (alt?.novaData) return; // passou para outro dia
-      out.push({ equipaId: eid, data: d, hora: alt?.novaHora || h.hora || "", local: alt?.novoLocal || h.local || "", duracao: alt?.novaDuracao || h.duracao || 20, mudouHora: !!alt?.novaHora, mudouLocal: !!alt?.novoLocal, cancelada: !!alt?.cancelada, motivo: alt?.motivo || "", altId: alt ? eid + "_" + d : null, original: d });
+      out.push({ equipaId: eid, data: d, hora: alt?.novaHora || h.hora || "", local: alt?.novoLocal || h.local || "", duracao: alt?.novaDuracao || h.duracao || 20, mudouHora: !!alt?.novaHora, mudouLocal: !!alt?.novoLocal, cancelada: !!alt?.cancelada, motivoDetalhe: alt?.motivoDetalhe || "", motivo: alt?.motivo || "", altId: alt ? eid + "_" + d : null, original: d });
     });
   }
   Object.entries(S.alteracoes).forEach(([id, a]) => {
@@ -371,8 +373,8 @@ function itemPrevista(p) {
   const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Realizada · ${s.nAtletas}</span>` : `<span class="chip bad">Não realizada</span>`)
     : p.cancelada ? `<span class="chip bad">Cancelada</span>` : p.data <= hojeISO() ? `<span class="chip warn">Por registar</span>` : "";
   const quem = s?._por ? " · registada por " + esc(nomeDeEmail(s._por).split(" ")[0]) : "";
-  const porque = s?.estado === "nao_dada" ? `<span class="m bad">Porquê: ${esc(s.motivo || "sem motivo indicado")}</span>` : "";
-  const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(p.motivo) + ")" : ""}` : p.cancelada ? ` · ${esc(p.motivo)}` : "";
+  const porque = s?.estado === "nao_dada" ? `<span class="m bad">Porquê: ${esc(motivoTxt(s) || "sem motivo indicado")}</span>` : "";
+  const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(motivoTxt(p)) + ")" : ""}` : p.cancelada ? ` · ${esc(motivoTxt(p))}` : "";
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
     <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>Sessão ${numeroNoMes(p.equipaId, p.data)}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
@@ -394,19 +396,24 @@ function formAlteracao(equipaId, data) {
       <div class="field" style="flex:1"><label for="aHora">Nova hora</label><input type="time" step="300" id="aHora" value="${horaStd(a.novaHora || e.hora)}"></div></div>
     <div id="aMudar2" class="row"><div class="field" style="flex:2"><label for="aLocal">Local</label><input type="text" id="aLocal" value="${esc(a.novoLocal || e.local || "")}"></div>
       <div class="field" style="flex:1"><label for="aDur">Duração (min)</label><input type="number" id="aDur" value="${a.novaDuracao || e.duracao || 20}"></div></div>
-    <div id="aCanc" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="aMot">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
+    <div id="aCanc" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="aMot">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div>
+      <input type="text" id="aMotTxt" value="${esc(a.motivoDetalhe || "")}" placeholder="Qual é o motivo?" aria-label="Explique o motivo"></div>
     <span class="m">Só muda esta semana. O horário habitual muda-se em Mais › Equipas.</span>
     <div class="actions">${S.alteracoes[id] ? `<button class="btn danger" id="aRepor">Repor horário normal</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="aOk">Guardar</button></div>`);
   const sync = () => {
     $("#aModo", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === modo)));
     $("#aMot", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === motivo)));
     $("#aMudar", el).hidden = $("#aMudar2", el).hidden = modo !== "mudar";
+    $("#aMotTxt", el).hidden = motivo !== "Outro";
   };
   $("#aModo", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { modo = b.dataset.v; sync(); } });
   $("#aMot", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { motivo = b.dataset.v; sync(); } });
   sync();
   $("#aOk", el).addEventListener("click", async () => {
+    const detalhe = $("#aMotTxt", el).value.trim();
+    if (modo === "cancelar" && (motivo || "Outro") === "Outro" && !detalhe) { $("#aMotTxt", el).hidden = false; $("#aMotTxt", el).focus(); return toast("Escolha o motivo ou explique-o em \"Outro\""); }
     let dados = { equipaId, data };
+    if (motivo === "Outro" && detalhe) dados.motivoDetalhe = detalhe;
     if (modo === "cancelar") dados = { ...dados, cancelada: true, motivo: motivo || "Outro" };
     else {
       const nd = $("#aData", el).value || data, nh = $("#aHora", el).value.trim();
@@ -688,7 +695,7 @@ function itemSessao(s) {
   const estado = s.estado === "dada"
     ? `<span class="chip ok">${s.nAtletas} atletas</span>`
     : `<span class="chip bad">Não realizada</span>`;
-  const linha = s.estado === "dada" ? (CORREU.find(c => c.v === s.correu)?.t || "") + (s.resumo ? " · " + esc(s.resumo) : "") : esc(s.motivo || "");
+  const linha = s.estado === "dada" ? (CORREU.find(c => c.v === s.correu)?.t || "") + (s.resumo ? " · " + esc(s.resumo) : "") : esc(motivoTxt(s));
   return `<button class="item" data-act="verSessao" data-id="${s.id}">
     <div class="row"><span class="t">${esc(equipaNome(s.equipaId))}</span>${estado}</div>
     <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${pessoaNome(s.dadaPor) ? " · " + esc(pessoaNome(s.dadaPor)) : ""}${s.exemplo ? " · exemplo" : ""}</span>${chipTema(temasDe(s))}</div>
@@ -727,7 +734,8 @@ function formSessao(s) {
       <div id="fItens">${editorItens(f.itens, f.temas)}</div>
       <div class="field"><label for="fResumo">Resumo (visível para treinadores e pais)</label><input type="text" id="fResumo" value="${esc(f.resumo)}" placeholder="Ex.: Boa adesão, rever receção dos saltos"></div>
     </div>
-    <div id="blocoNao" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="fMotivo">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div></div>
+    <div id="blocoNao" class="field"><span class="lbl">Motivo</span><div class="seg bad-sel" id="fMotivo">${MOTIVOS.map(m => `<button data-v="${esc(m)}">${esc(m)}</button>`).join("")}</div>
+      <input type="text" id="fMotivoTxt" value="${esc(f.motivoDetalhe || "")}" placeholder="Qual foi o motivo?" aria-label="Explique o motivo" ${f.motivo === "Outro" ? "" : "hidden"}></div>
     <div class="field"><label for="fNota">Nota interna (só equipa técnica)</label><textarea id="fNota" placeholder="Observações para a próxima sessão">${esc(nota)}</textarea></div>
     <div class="actions">${!novo && podeEscrever() ? `<button class="btn danger" id="fDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="fOk">Guardar</button></div>`);
 
@@ -753,15 +761,18 @@ function formSessao(s) {
   });
   $("#fData", el).addEventListener("change", () => $("#fEq", el).dispatchEvent(new Event("change")));
   seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); ligarSegTemas($("#fTema", el), f.temas); seg("#fMotivo", "motivo"); vis();
+  $("#fMotivo", el).addEventListener("click", () => setTimeout(() => { const t = $("#fMotivoTxt", el); t.hidden = f.motivo !== "Outro"; if (!t.hidden) t.focus(); }, 0));
   el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, f.nAtletas + +b.dataset.step); $("#fN", el).textContent = f.nAtletas; }));
 
   $("#fOk", el).addEventListener("click", async () => {
+    const detalhe = $("#fMotivoTxt", el).value.trim();
+    if (f.estado !== "dada" && (f.motivo || "Outro") === "Outro" && !detalhe) { $("#fMotivoTxt", el).hidden = false; $("#fMotivoTxt", el).focus(); return toast("Escolha o motivo ou explique-o em \"Outro\""); }
     const id = s?.id || novoId("s");
     const dados = {
       data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.temas[0], temas: f.temas.slice(),
       nAtletas: f.estado === "dada" ? f.nAtletas : 0, correu: f.estado === "dada" ? f.correu : null,
       itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
-      motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
+      motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), motivoDetalhe: f.estado !== "dada" && (f.motivo || "Outro") === "Outro" ? detalhe : "", criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
     };
     if (s?.exemplo) dados.exemplo = true;
     try {
@@ -787,7 +798,7 @@ function verSessao(id) {
     ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
       ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
       ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
-      : `<div class="field"><span class="lbl">Não foi realizada</span><span>${esc(s.motivo)}</span></div>`}
+      : `<div class="field"><span class="lbl">Não foi realizada</span><span>${esc(motivoTxt(s))}</span></div>`}
     <div class="actions"><button class="btn" data-close>Fechar</button></div>`);
 }
 
@@ -1333,7 +1344,7 @@ function viewSemana() {
       const e = S.equipas[p.equipaId] || {}, s = sessaoDe(p), pf = pfDe(p), cor = corMod(e.modalidade);
       const alterada = p.cancelada || p.mudada || p.mudouLocal || p.mudouHora;
       const estado = s ? (s.estado === "dada" ? `<span class="wk-st ok">✓ realizada</span>` : `<span class="wk-st bad">não realizada</span>`) : p.cancelada ? `<span class="wk-st bad">não há</span>` : alterada ? `<span class="wk-st warn">alterada</span>` : "";
-      html += `<button class="wk-card${p.cancelada ? " off" : ""}" style="--c:${cor}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}" title="${p.motivo ? esc(p.motivo) : "Alterar hora, local ou dia"}">
+      html += `<button class="wk-card${p.cancelada ? " off" : ""}" style="--c:${cor}" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}" title="${p.motivo ? esc(motivoTxt(p)) : "Alterar hora, local ou dia"}">
         <span class="wk-hora">${esc(horaStd(p.hora) || "—")}<span class="m">–${minFim(p.hora, p.duracao)}</span></span>
         <span class="wk-mod">${esc(e.modalidade || "")}</span>${e.escalao ? `<span class="m">${esc(e.escalao)}</span>` : ""}
         <span class="wk-loc">${esc(p.local || "Local por definir")}</span>
