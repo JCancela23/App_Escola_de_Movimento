@@ -349,7 +349,7 @@ function previstas(de, ate) {
     const dow = new Date(d + "T12:00").getDay();
     const ep = epocaDe(d);
     Object.entries(S.equipas).forEach(([eid, e]) => {
-      if (e.ativa === false || epocaEquipa(e) !== ep) return; // ainda não arrancou ou é de outra época
+      if (e.ativa === false || epocaEquipa(e) !== ep || (e.inicio && d < e.inicio)) return; // ainda não arrancou ou é de outra época
       const h = horarioDe(e).find(x => x.dia === dow);
       if (!h) return;
       const alt = S.alteracoes[eid + "_" + d];
@@ -1494,6 +1494,7 @@ function editEquipa(id) {
       <datalist id="mods"><option>Andebol</option><option>Futsal</option><option>Basquetebol</option><option>Voleibol</option><option>Hóquei em patins</option><option>Natação</option></datalist></div>
     <div class="field"><label for="qEsc">Escalão</label><input type="text" id="qEsc" value="${esc(e.escalao)}" placeholder="Sub-12"></div>
     <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="qAtiva" ${e.ativa === false ? "" : "checked"} style="width:22px;height:22px"><span>Em funcionamento (desmarque se ainda não arrancou)</span></label>
+    <div class="field"><label for="qInicio">Começou a (sessões da Escola do Movimento)</label><input type="date" id="qInicio" value="${e.inicio || ""}"><span class="m">Antes desta data a app não prevê sessões para este escalão. Deixe vazio se começou com a época.</span></div>
     <div class="field"><span class="lbl">Treinos da equipa (início · fim · local)</span><div class="list" id="qTr">${[1, 2, 3, 4, 5, 6, 0].map(linhaTr).join("")}</div></div>
     <div class="field"><span class="lbl">Intervenção da Escola do Movimento (hora · local · minutos)</span><div class="list" id="qHor">${[1, 2, 3, 4, 5, 6, 0].map(linha).join("")}</div></div>
     <div class="field"><label for="qResp">Preparador físico responsável</label><select id="qResp"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}" ${p.id === e.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select></div>
@@ -1516,7 +1517,7 @@ function editEquipa(id) {
   $("#qTrein", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = treinadores.indexOf(b.dataset.v); i >= 0 ? treinadores.splice(i, 1) : treinadores.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
   $("#qOk", el).addEventListener("click", async () => {
     const modalidade = $("#qMod", el).value.trim(); if (!modalidade) return toast("Escreva a modalidade");
-    try { await guardar("equipas", id || novoId("e"), { modalidade, escalao: $("#qEsc", el).value.trim(), epoca: e.epoca || epocaVista(), ativa: $("#qAtiva", el).checked, treinos: [...el.querySelectorAll("[data-tdia]")].filter(r => r.querySelector(".tOn").checked).map(r => ({ dia: +r.dataset.tdia, inicio: r.querySelector(".tIni").value.trim(), fim: r.querySelector(".tFim").value.trim(), local: r.querySelector(".tLoc").value.trim() })), ...horarioDoForm(el), responsavel: $("#qResp", el).value || null, treinadores }); fecharFolha(); toast("Equipa guardada"); } catch (err) {}
+    try { await guardar("equipas", id || novoId("e"), { modalidade, escalao: $("#qEsc", el).value.trim(), epoca: e.epoca || epocaVista(), ativa: $("#qAtiva", el).checked, inicio: $("#qInicio", el).value || null, treinos: [...el.querySelectorAll("[data-tdia]")].filter(r => r.querySelector(".tOn").checked).map(r => ({ dia: +r.dataset.tdia, inicio: r.querySelector(".tIni").value.trim(), fim: r.querySelector(".tFim").value.trim(), local: r.querySelector(".tLoc").value.trim() })), ...horarioDoForm(el), responsavel: $("#qResp", el).value || null, treinadores }); fecharFolha(); toast("Equipa guardada"); } catch (err) {}
   });
   $("#qDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("equipas", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
 }
