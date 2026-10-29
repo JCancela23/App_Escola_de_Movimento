@@ -270,7 +270,9 @@ function horarioDe(e) {
   if (Array.isArray(e.horario)) return e.horario;
   return (e.dias || []).map(d => ({ dia: d, hora: e.hora || "", local: e.local || "", duracao: e.duracao || 20 }));
 }
-function horarioNoDia(e, iso) { const dow = new Date(iso + "T12:00").getDay(); return horarioDe(e).find(h => h.dia === dow) || horarioDe(e)[0] || { hora: e.hora || "", local: e.local || "", duracao: e.duracao || 20 }; }
+// horário em vigor numa data: os anteriores valem até à data "ate" (ex.: horário de setembro até 9 out)
+function horarioEm(e, iso) { const a = (e.horariosAnteriores || []).filter(h => iso <= h.ate).sort((x, y) => x.ate.localeCompare(y.ate))[0]; return a ? a.horario : horarioDe(e); }
+function horarioNoDia(e, iso) { const dow = new Date(iso + "T12:00").getDay(), hs = horarioEm(e, iso); return hs.find(h => h.dia === dow) || hs[0] || { hora: e.hora || "", local: e.local || "", duracao: e.duracao || 20 }; }
 function pessoaNome(id) { return S.pessoas[id]?.nome || ""; }
 function preparadores() { return sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome)).filter(p => p.funcao === "Preparador físico" || p.funcao === "Coordenador"); }
 function equipaNome(id) { const e = S.equipas[id]; return e ? (e.modalidade + " " + (e.escalao || "")).trim() : "Equipa removida"; }
@@ -350,7 +352,7 @@ function previstas(de, ate) {
     const ep = epocaDe(d);
     Object.entries(S.equipas).forEach(([eid, e]) => {
       if (e.ativa === false || epocaEquipa(e) !== ep || (e.inicio && d < e.inicio)) return; // ainda não arrancou ou é de outra época
-      const h = horarioDe(e).find(x => x.dia === dow);
+      const h = horarioEm(e, d).find(x => x.dia === dow);
       if (!h) return;
       const alt = S.alteracoes[eid + "_" + d];
       if (alt?.novaData) return; // passou para outro dia
@@ -1142,7 +1144,7 @@ function viewMais() {
   const k0 = mesKey(new Date());
   const inicio = anoEpoca(epocaVista()); // época de setembro a junho
   const meses = []; for (let i = 0; i < 10; i++) meses.push(mesKey(new Date(inicio, 8 + i, 1)));
-  let html = viewEpocas() + viewSemana() + viewReunioes() + viewPessoas() + viewGerirTemas() + viewHistorico() + `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
+  let html = `<section><div class="sec-h"><h2>Plano anual</h2><span class="sub">época ${inicio}/${String(inicio + 1).slice(2)}</span></div><div class="month-grid">`;
   meses.forEach(k => {
     const p = S.plano[k];
     html += `<button class="item" data-act="editPlano" data-id="${k}" ${podeGerir() ? "" : "disabled"} style="${k === k0 ? "border-color:var(--accent)" : ""}">
@@ -1151,6 +1153,7 @@ function viewMais() {
       ${podeGerir() ? (() => { const n = (p?.sessoes || []).filter(x => S.planos[x]).length, mx = Math.max(0, ...Object.values(sessoesPorEquipaNoMes(k))); return `<span class="m">${n} de ${mx} sessões com plano</span>`; })() : ""}</button>`;
   });
   html += `</div></section>`;
+  const hPlano = html; html = "";
 
   if (podeEscrever()) {
     html += `<section><div class="sec-h"><h2>Modalidades</h2><span class="sub">${Object.keys(S.equipas).length} escalões</span></div><span class="m">Treinos de cada escalão, treinadores e horário da nossa intervenção.</span><div class="list">`;
@@ -1165,6 +1168,7 @@ function viewMais() {
     });
     html += `</div><button class="btn" data-act="editEquipa">Adicionar modalidade / escalão</button></section>`;
   }
+  const hMod = html; html = "";
 
   const acessos = sorted(S.acessos, (a, b) => a.id.localeCompare(b.id));
   html += `<section><div class="sec-h"><h2>Acessos</h2></div>
@@ -1183,7 +1187,21 @@ function viewMais() {
     if (Object.values(S.sessoes).some(s => s.exemplo)) html += `<button class="btn danger" id="limparEx">Apagar sessões de exemplo</button>`;
   }
   html += `</section>`;
-  return html;
+  const partes = [
+    ["semana", "Horário da semana", "Grelha visual das sessões, por dia e por PF", viewSemana()],
+    ["plano", "Plano anual", "Tema de cada mês e Sessão 1, 2, 3…", podeEscrever() ? hPlano : ""],
+    ["modalidades", "Modalidades e escalões", "Horários, treinos, treinadores e início", hMod],
+    ["pessoas", "Pessoas", "Treinadores, coordenadores e contactos", viewPessoas()],
+    ["reunioes", "Reuniões", (() => { const n = eDono() ? tarefasAbertas().length : 0; return n ? n + " tarefa(s) por fazer" : "Notas e tarefas das reuniões"; })(), viewReunioes()],
+    ["temas", "Temas", "Saltar, gatinhar, empurrar, puxar e outros", viewGerirTemas()],
+    ["historico", "Histórico", "Quem registou ou alterou o quê", viewHistorico()],
+    ["epoca", "Época", "Ver outras épocas ou preparar a seguinte", viewEpocas()],
+    ["acessos", "Conta e acessos", sessao ? "Sair, link para pais e treinadores" + (eDono() ? ", acessos" : "") : "Entrar, link para pais e treinadores", html]
+  ].filter(x => x[3]);
+  const sel = partes.find(x => x[0] === maisSec);
+  if (sel) return `<button class="btn ghost" data-mais="" style="margin-top:14px">‹ Mais</button>` + sel[3];
+  maisSec = null;
+  return `<section><div class="sec-h"><h2>Mais</h2></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${partes.map(([k, t, d]) => `<button class="item" data-mais="${k}" style="align-content:start"><span class="t">${t}</span><span class="m" style="font-size:13px">${esc(d)}</span></button>`).join("")}</div></section>`;
 }
 // semanas (segunda-feira) que têm dias de sessão dentro do mês
 function semanasDoMes(k) {
@@ -1247,7 +1265,7 @@ function nomeDeEmail(em) {
 function horaDe(ts) { const d = new Date(ts); return dataCurta(isoDe(d)) + " às " + d.toTimeString().slice(0, 5); }
 function quemFoi(x) { return x?._por ? `<span class="m">Última alteração: ${esc(nomeDeEmail(x._por))}, ${horaDe(x._em)}</span>` : ""; }
 const TAB_NOME = { sessoes: "a sessão", equipas: "o escalão", pessoas: "a pessoa", avaliacoes: "a avaliação", atletas: "o atleta", notas: "a nota da sessão", exercicios: "o exercício", plano: "o plano anual", planos: "o plano de sessão", material: "o material", planeadas: "o planeamento", semanas: "o planeamento", acessos: "o acesso", reunioes: "a reunião" };
-const CAMPO_NOME = { hora: "hora", local: "local", duracao: "duração", nAtletas: "nº de atletas", estado: "se foi realizada", motivo: "motivo", resumo: "resumo", correu: "como correu", itens: "exercícios", exercicios: "exercícios", horario: "horário fixo", treinos: "treinos", responsavel: "PF", preparador: "PF", treinadores: "treinadores", novaData: "dia", novaHora: "hora", novoLocal: "local", novaDuracao: "duração", cancelada: "cancelamento", temas: "temas", tema: "temas", nome: "nome", telefone: "telefone", email: "email", funcao: "função", modalidade: "modalidade", escalao: "escalão", data: "data", texto: "texto", papel: "papel", foco: "foco", ativa: "ativo/inativo" };
+const CAMPO_NOME = { horariosAnteriores: "horário", horarioDesde: "horário", dias: "horário", inicio: "início", epoca: "época", videos: "vídeos", video: "vídeos", sessoes: "sessões do mês", testes: "testes", inicios: "início da época", hora: "hora", local: "local", duracao: "duração", nAtletas: "nº de atletas", estado: "se foi realizada", motivo: "motivo", resumo: "resumo", correu: "como correu", itens: "exercícios", exercicios: "exercícios", horario: "horário fixo", treinos: "treinos", responsavel: "PF", preparador: "PF", treinadores: "treinadores", novaData: "dia", novaHora: "hora", novoLocal: "local", novaDuracao: "duração", cancelada: "cancelamento", temas: "temas", tema: "temas", nome: "nome", telefone: "telefone", email: "email", funcao: "função", modalidade: "modalidade", escalao: "escalão", data: "data", texto: "texto", papel: "papel", foco: "foco", ativa: "ativo/inativo" };
 function descHist(h) {
   const d = h.depois?.data || h.antes?.data || {}, t = h.tabela;
   let alvo = "";
@@ -1269,7 +1287,7 @@ function viewHistorico() {
   if (!eDono()) return "";
   const quem = [...new Set(HIST.map(h => h.por || ""))];
   if (histPor !== "todos" && !quem.includes(histPor)) histPor = "todos";
-  const lista = HIST.filter(h => histPor === "todos" || (h.por || "") === histPor);
+  const lista = HIST.filter(h => (histPor === "todos" || (h.por || "") === histPor) && !(h.acao === "insert" && HIST.some(x => x.acao === "update" && x.registo === h.registo && x.tabela === h.tabela && x.em === h.em)));
   let html = `<section><div class="sec-h"><h2>Histórico</h2><span class="sub">quem registou ou alterou</span></div>`;
   if (quem.length > 1) html += `<div class="filters" id="histPor"><button data-v="todos" aria-pressed="${histPor === "todos"}">Todos</button>${quem.map(e => `<button data-v="${esc(e)}" aria-pressed="${histPor === e}">${esc(nomeDeEmail(e))}</button>`).join("")}</div>`;
   html += `<div class="list">`;
@@ -1282,7 +1300,7 @@ function viewHistorico() {
   if (lista.length > histN) html += `<button class="btn" id="histMais">Ver mais</button>`;
   return html + `</div></section>`;
 }
-let semOffset = 0, semPF = "todos";
+let semOffset = 0, semPF = "todos", maisSec = null;
 // Cores fixas por modalidade (as restantes vêm da paleta pela ordem)
 const COR_MOD = { "Hóquei em patins": "#2f9e44", "Basquetebol": "#d6336c", "Triatlo": "#7b6f5d", "Andebol": "#74b816", "Voleibol": "#f08c00", "Natação": "#1c9ab8", "Futsal": "#3b7ddd" };
 const PALETA = ["#7048e8", "#c2255c", "#0c8599", "#e8590c", "#5c940d", "#1971c2"];
@@ -1468,7 +1486,8 @@ function verEquipa(id) {
     ${e.ativa === false ? `<span class="chip warn" style="justify-self:start">Ainda não ativa</span>` : ""}
     <div class="field"><span class="lbl">Treinos da equipa</span>${tr.map(t => `<span><b>${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][t.dia]}</b> ${esc(t.inicio)}${t.fim ? "–" + esc(t.fim) : ""}${t.local ? " · " + esc(t.local) : ""}</span>`).join("") || `<span class="m">Por indicar</span>`}</div>
     <div class="field"><span class="lbl">Intervenção da Escola do Movimento</span>${iv.map(h => `<span><b>${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][h.dia]}</b> ${esc(h.hora)} · ${esc(h.local)} · ${h.duracao || 20} min</span>`).join("") || `<span class="m">Por indicar</span>`}
-      ${pessoaNome(e.responsavel) ? `<span class="m">Preparador físico: ${esc(pessoaNome(e.responsavel))}</span>` : ""}</div>
+      ${pessoaNome(e.responsavel) ? `<span class="m">Preparador físico: ${esc(pessoaNome(e.responsavel))}</span>` : ""}
+      ${e.horarioDesde ? `<span class="m">Em vigor desde ${dataCurta(e.horarioDesde).slice(4)}.</span>` : ""}${(e.horariosAnteriores || []).map(h => `<span class="m">Até ${dataCurta(h.ate).slice(4)}: ${ordDias(h.horario).map(x => `${DIAS[x.dia]} ${esc(x.hora)} · ${esc(x.local)}`).join(", ")}</span>`).join("")}</div>
     <div class="field"><span class="lbl">Treinadores</span>${trein.map(p => `<div class="item" style="padding:8px 10px"><span class="t">${esc(p.nome)}</span>${linhaContacto("Telemóvel", p.telefone, "tel:")}${linhaContacto("Email", p.email, "mailto:")}${!p.telefone && !p.email ? `<span class="m">Sem contactos</span>` : ""}</div>`).join("") || `<span class="m">Por indicar</span>`}</div>
     <div class="actions"><button class="btn" id="eqEdit">Editar</button><button class="btn" data-close>Fechar</button></div>`);
   el.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copiar(b.dataset.copy, b)));
@@ -1493,10 +1512,12 @@ function editEquipa(id) {
     <div class="field"><label for="qMod">Modalidade</label><input type="text" id="qMod" value="${esc(e.modalidade)}" list="mods">
       <datalist id="mods"><option>Andebol</option><option>Futsal</option><option>Basquetebol</option><option>Voleibol</option><option>Hóquei em patins</option><option>Natação</option></datalist></div>
     <div class="field"><label for="qEsc">Escalão</label><input type="text" id="qEsc" value="${esc(e.escalao)}" placeholder="Sub-12"></div>
-    <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="qAtiva" ${e.ativa === false ? "" : "checked"} style="width:22px;height:22px"><span>Em funcionamento (desmarque se ainda não arrancou)</span></label>
+    <label class="row" style="justify-content:flex-start;gap:10px"><input type="checkbox" id="qAtiva" ${e.ativa === false ? "" : "checked"} style="width:22px;height:22px"><span>Ativo (desmarque só se este escalão deixar de ter sessões)</span></label>
     <div class="field"><label for="qInicio">Começou a (sessões da Escola do Movimento)</label><input type="date" id="qInicio" value="${e.inicio || ""}"><span class="m">Antes desta data a app não prevê sessões para este escalão. Deixe vazio se começou com a época.</span></div>
     <div class="field"><span class="lbl">Treinos da equipa (início · fim · local)</span><div class="list" id="qTr">${[1, 2, 3, 4, 5, 6, 0].map(linhaTr).join("")}</div></div>
-    <div class="field"><span class="lbl">Intervenção da Escola do Movimento (hora · local · minutos)</span><div class="list" id="qHor">${[1, 2, 3, 4, 5, 6, 0].map(linha).join("")}</div></div>
+    <div class="field"><span class="lbl">Intervenção da Escola do Movimento (hora · local · minutos)</span>${e.horarioDesde ? `<span class="m">Em vigor desde ${dataCurta(e.horarioDesde).slice(4)}.</span>` : ""}<div class="list" id="qHor">${[1, 2, 3, 4, 5, 6, 0].map(linha).join("")}</div>
+      ${id ? `<div class="field"><label for="qDesde">Se mudou o horário, a partir de que dia vale o novo?</label><input type="date" id="qDesde"><span class="m">Preencha só quando muda o horário: o horário antigo fica guardado para as semanas anteriores.</span></div>` : ""}
+      ${(e.horariosAnteriores || []).length ? `<span class="lbl" style="margin-top:6px">Horários anteriores</span>${e.horariosAnteriores.slice().sort((x, y) => x.ate.localeCompare(y.ate)).map((h, i) => `<div class="row" data-hant="${h.ate}"><span class="m">Até ${dataCurta(h.ate).slice(4)}: ${ordDias(h.horario).map(x => `${DIAS[x.dia]} ${esc(x.hora)} · ${esc(x.local)}`).join(", ") || "sem sessões"}</span><button class="btn ghost" data-rmhant="${h.ate}">Apagar</button></div>`).join("")}` : ""}</div>
     <div class="field"><label for="qResp">Preparador físico responsável</label><select id="qResp"><option value="">Por indicar</option>${preparadores().map(p => `<option value="${p.id}" ${p.id === e.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select></div>
     <div class="field"><span class="lbl">Treinadores</span><div class="seg" id="qTrein">${sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome)).filter(p => p.funcao === "Treinador").map(p => `<button data-v="${p.id}" aria-pressed="${treinadores.includes(p.id)}">${esc(p.nome)}</button>`).join("") || ""}</div>
       <details><summary class="btn ghost" style="display:inline-block">Novo treinador</summary><div class="field" style="margin-top:8px">
@@ -1515,9 +1536,13 @@ function editEquipa(id) {
   });
   $("#qHor", el).addEventListener("change", ev => { if (ev.target.classList.contains("hOn")) ev.target.closest("[data-dia]").querySelector(".hCampos").hidden = !ev.target.checked; });
   $("#qTrein", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = treinadores.indexOf(b.dataset.v); i >= 0 ? treinadores.splice(i, 1) : treinadores.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
+  let anteriores = (e.horariosAnteriores || []).slice();
+  el.addEventListener("click", ev => { const b = ev.target.closest("[data-rmhant]"); if (b) { anteriores = anteriores.filter(h => h.ate !== b.dataset.rmhant); b.closest("[data-hant]").remove(); } });
   $("#qOk", el).addEventListener("click", async () => {
     const modalidade = $("#qMod", el).value.trim(); if (!modalidade) return toast("Escreva a modalidade");
-    try { await guardar("equipas", id || novoId("e"), { modalidade, escalao: $("#qEsc", el).value.trim(), epoca: e.epoca || epocaVista(), ativa: $("#qAtiva", el).checked, inicio: $("#qInicio", el).value || null, treinos: [...el.querySelectorAll("[data-tdia]")].filter(r => r.querySelector(".tOn").checked).map(r => ({ dia: +r.dataset.tdia, inicio: r.querySelector(".tIni").value.trim(), fim: r.querySelector(".tFim").value.trim(), local: r.querySelector(".tLoc").value.trim() })), ...horarioDoForm(el), responsavel: $("#qResp", el).value || null, treinadores }); fecharFolha(); toast("Equipa guardada"); } catch (err) {}
+    const desde = $("#qDesde", el)?.value, extra = { horariosAnteriores: anteriores, horarioDesde: e.horarioDesde || null };
+    if (desde) { extra.horariosAnteriores = anteriores.filter(h => h.ate < desde).concat([{ ate: somaDias(desde, -1), horario: horarioDe(e) }]); extra.horarioDesde = desde; }
+    try { await guardar("equipas", id || novoId("e"), { ...extra, modalidade, escalao: $("#qEsc", el).value.trim(), epoca: e.epoca || epocaVista(), ativa: $("#qAtiva", el).checked, inicio: $("#qInicio", el).value || null, treinos: [...el.querySelectorAll("[data-tdia]")].filter(r => r.querySelector(".tOn").checked).map(r => ({ dia: +r.dataset.tdia, inicio: r.querySelector(".tIni").value.trim(), fim: r.querySelector(".tFim").value.trim(), local: r.querySelector(".tLoc").value.trim() })), ...horarioDoForm(el), responsavel: $("#qResp", el).value || null, treinadores }); fecharFolha(); toast("Equipa guardada"); } catch (err) {}
   });
   $("#qDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { apagar("equipas", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
 }
@@ -1552,7 +1577,7 @@ function render() {
   requestAnimationFrame(() => document.querySelectorAll("#view textarea").forEach(crescer));
   document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
 }
-function irPara(t) { tab = t; try { localStorage.setItem("em_tab", t); } catch (e) {} render(); scrollTo(0, 0); }
+function irPara(t) { if (t === "mais") maisSec = null; tab = t; try { localStorage.setItem("em_tab", t); } catch (e) {} render(); scrollTo(0, 0); }
 document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) irPara(b.dataset.tab); });
 $("#view").addEventListener("click", e => {
   const go = e.target.closest("[data-tab-go]"); if (go) return irPara(go.dataset.tabGo);
@@ -1578,6 +1603,7 @@ $("#view").addEventListener("click", e => {
     (async () => { for (const nome of nomes) { try { await guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }); } catch (err) { break; } } toast(nomes.length + " atleta(s) adicionados"); render(); })();
     return;
   }
+  const ms = e.target.closest("[data-mais]"); if (ms) { maisSec = ms.dataset.mais || null; render(); return scrollTo(0, 0); }
   const hs = e.target.closest("[data-hsem]"); if (hs) { hojeOffset = +hs.dataset.hsem === 0 ? 0 : hojeOffset + +hs.dataset.hsem; return render(); }
   const sb2 = e.target.closest("[data-sem]"); if (sb2) { semOffset += +sb2.dataset.sem; return render(); }
   if (e.target.closest("#histPor button")) { histPor = e.target.closest("button").dataset.v; histN = 30; return render(); }
@@ -1733,7 +1759,7 @@ async function carregarTudo() {
   render();
 }
 try { const t = localStorage.getItem("em_tab"); if (t) tab = t; } catch (e) {}
-document.getElementById("role").addEventListener("click", () => { if (role.nivel === "dono") return escolherVista(); if (!sb) return; if (sessao) irPara("mais"); else formLogin(); });
+document.getElementById("role").addEventListener("click", () => { if (role.nivel === "dono") return escolherVista(); if (!sb) return; if (sessao) { maisSec = "acessos"; tab = "mais"; render(); return scrollTo(0, 0); } else formLogin(); });
 render();
 (async () => {
   const cfg = window.EM_CONFIG || {};
