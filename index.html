@@ -155,7 +155,7 @@ table.tab td + td, table.tab th + th { text-align: right }
 .empty { color: var(--muted); padding: 16px; text-align: center; border: 1px dashed var(--line); border-radius: 12px }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; z-index: 30; font-size: 15px }
 a { color: var(--accent) }
-.video-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600 }
+.video-link { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600 }
 .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden }
 .bar i { display: block; height: 100% }
 @media (prefers-reduced-motion: no-preference) { .sheet { animation: up .2s ease-out } @keyframes up { from { transform: translateY(24px); opacity: .6 } } }
@@ -794,7 +794,7 @@ function itemExercicio(e) {
   return `<button class="item" data-act="verExercicio" data-id="${e.id}">
     <div class="row"><span class="t">${esc(e.nome)}</span>${chipTema(e.tema)}</div>
     <span class="m">${esc((e.descricao || "").slice(0, 110))}${(e.descricao || "").length > 110 ? "…" : ""}</span>
-    <span class="m">${e.duracao ? e.duracao + " min" : ""}${e.video ? " · tem vídeo" : ""}</span></button>`;
+    <span class="m">${e.duracao ? e.duracao + " min" : ""}${videosDe(e).length ? " · " + (videosDe(e).length > 1 ? videosDe(e).length + " vídeos" : "tem vídeo") : ""}</span></button>`;
 }
 function viewExercicios() {
   if (!podeEscrever()) subExe = "exercicios";
@@ -817,30 +817,36 @@ function verExercicio(id) {
   const e = { id, ...S.exercicios[id] };
   const el = abrirFolha(`<h2>${esc(e.nome)}</h2>
     <div class="row"><span class="m">${e.duracao ? e.duracao + " min" : ""}</span>${chipTema(e.tema)}</div>
-    ${e.video ? `<a class="video-link" href="${esc(e.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a>` : `<span class="m">Ainda sem vídeo.</span>`}
+    ${videosDe(e).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(e)}</div>` : `<span class="m">Ainda sem vídeo.</span>`}
     ${e.descricao ? `<div class="field"><span class="lbl">Como fazer</span><span style="white-space:pre-line">${esc(e.descricao)}</span></div>` : ""}
     ${e.progressao ? `<div class="field"><span class="lbl">Progressão</span><span style="white-space:pre-line">${esc(e.progressao)}</span></div>` : ""}
     <div class="actions">${podeGerir() ? `<button class="btn" id="eEdit">Editar</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
   $("#eEdit", el)?.addEventListener("click", () => formExercicio(e));
 }
+// um exercício pode ter vários vídeos (ex.: duas maneiras de gatinhar feitas na mesma tarefa)
+function videosDe(e) { return e?.videos?.length ? e.videos.filter(v => v.url) : e?.video ? [{ nome: "", url: e.video }] : []; }
+function linksVideo(e) { const l = videosDe(e); return l.map((v, i) => `<a class="video-link" href="${esc(v.url)}" target="_blank" rel="noopener">▶ ${esc(v.nome || (l.length > 1 ? "Vídeo " + (i + 1) : "Ver vídeo"))}</a>`).join(""); }
+const linhaVideo = v => `<div class="item" style="padding:8px 10px" data-vid><div class="row"><input type="text" class="vNome" value="${esc(v.nome)}" placeholder="Nome (ex.: Maneira 1)" aria-label="Nome do vídeo" style="flex:1;min-width:0"><button class="btn ghost" data-rmvid aria-label="Tirar vídeo">✕</button></div><input type="url" class="vUrl" value="${esc(v.url)}" placeholder="https://" aria-label="Link do vídeo"></div>`;
 function formExercicio(e) {
   e = e || { tema: TEMAS[filtroTema] ? filtroTema : "" };
   const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
     <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
     <div class="field"><label for="xTema">Tema (opcional)</label><select id="xTema"><option value="">Sem tema</option>${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
     <div class="field"><label for="xDur">Duração (min)</label><input type="number" id="xDur" min="1" max="30" value="${e.duracao || 5}"></div>
-    <div class="field"><label for="xVideo">Link do vídeo (YouTube, Instagram, Drive…)</label><input type="url" id="xVideo" value="${esc(e.video)}" placeholder="https://"></div>
+    <div class="field"><span class="lbl">Vídeos (YouTube, Instagram, Drive…)</span><span class="m">Pode pôr mais do que um, por exemplo um para cada maneira de fazer.</span><div class="list" id="xVids">${(videosDe(e).length ? videosDe(e) : [{ nome: "", url: "" }]).map(linhaVideo).join("")}</div><button class="btn" id="xAddVid">+ Outro vídeo</button></div>
     <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
     <div class="field"><label for="xProg">Progressão</label><textarea id="xProg">${esc(e.progressao)}</textarea></div>
     <div class="actions">${e.id ? `<button class="btn danger" id="xDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="xOk">Guardar</button></div>`);
   $("#xOk", el).addEventListener("click", async () => {
     const nome = $("#xNome", el).value.trim(); if (!nome) return toast("Escreva o nome do exercício");
-    const v = $("#xVideo", el).value.trim();
+    const videos = [...el.querySelectorAll("[data-vid]")].map(r => ({ nome: r.querySelector(".vNome").value.trim(), url: r.querySelector(".vUrl").value.trim() })).filter(v => /^https?:\/\//.test(v.url));
     try {
-      await guardar("exercicios", e.id || novoId("x"), { nome, tema: $("#xTema", el).value, duracao: +$("#xDur", el).value || null, video: /^https?:\/\//.test(v) ? v : "", descricao: $("#xDesc", el).value.trim(), progressao: $("#xProg", el).value.trim() });
+      await guardar("exercicios", e.id || novoId("x"), { nome, tema: $("#xTema", el).value, duracao: +$("#xDur", el).value || null, video: videos[0]?.url || "", videos, descricao: $("#xDesc", el).value.trim(), progressao: $("#xProg", el).value.trim() });
       fecharFolha(); toast("Exercício guardado");
     } catch (err) {}
   });
+  $("#xAddVid", el).addEventListener("click", () => { $("#xVids", el).insertAdjacentHTML("beforeend", linhaVideo({ nome: "", url: "" })); $("#xVids", el).lastElementChild.querySelector(".vNome").focus(); });
+  el.addEventListener("click", ev => { const r = ev.target.closest("[data-rmvid]"); if (r) r.closest("[data-vid]").remove(); });
   $("#xDel", el)?.addEventListener("click", ev => {
     const b = ev.currentTarget;
     if (b.dataset.armed) { apagar("exercicios", e.id); fecharFolha(); toast("Exercício apagado"); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; }
@@ -874,7 +880,7 @@ function htmlPlano(pl) {
       <div class="row"><span class="t">${n + 1}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
       ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
       ${i.obs ? `<span><b>Obs.:</b> ${esc(i.obs)}</span>` : ""}
-      ${x.video ? `<a class="video-link" href="${esc(x.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a>` : ""}</div>`; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+      ${videosDe(x).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(x)}</div>` : ""}</div>`; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
   return `${chipTema(temasDe(pl))}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
     ${(pl.material || []).length ? `<div class="field"><span class="lbl">Material</span>${pl.material.filter(m => S.material[m.materialId]).map(m => `<span>• ${esc(S.material[m.materialId].nome)}${m.qtd ? " × " + esc(m.qtd) : ""}</span>`).join("")}</div>` : ""}
     ${pl.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(pl.notas)}</span></div>` : ""}`;
