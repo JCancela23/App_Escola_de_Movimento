@@ -497,11 +497,11 @@ function calcRelatorio() {
   const usados = new Set();
   prev.forEach(p => {
     const s = regs.find(r => r.equipaId === p.equipaId && r.data === p.data);
-    if (s) { usados.add(s.id); linhas.push({ ...p, estado: s.estado, motivo: s.motivo, nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor }); }
+    if (s) { usados.add(s.id); linhas.push({ ...p, estado: s.estado, motivo: s.motivo, motivoDetalhe: s.motivoDetalhe || "", nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor }); }
     else if (p.cancelada) linhas.push({ ...p, estado: "nao_dada", motivo: p.motivo });
     else linhas.push({ ...p, estado: "por_registar" });
   });
-  regs.filter(s => !usados.has(s.id)).forEach(s => linhas.push({ equipaId: s.equipaId, data: s.data, estado: s.estado, motivo: s.motivo, nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor, extra: true }));
+  regs.filter(s => !usados.has(s.id)).forEach(s => linhas.push({ equipaId: s.equipaId, data: s.data, estado: s.estado, motivo: s.motivo, motivoDetalhe: s.motivoDetalhe || "", nAtletas: +s.nAtletas || 0, dadaPor: s.dadaPor, extra: true }));
   linhas.forEach(l => { if (l.estado === "nao_dada" && l.motivo === FERIAS) l.estado = "ferias"; });
   const dadas = linhas.filter(l => l.estado === "dada"), nao = linhas.filter(l => l.estado === "nao_dada"), porReg = linhas.filter(l => l.estado === "por_registar"), ferias = linhas.filter(l => l.estado === "ferias");
   const atletas = dadas.reduce((a, l) => a + l.nAtletas, 0);
@@ -512,7 +512,7 @@ function calcRelatorio() {
     if (l.estado === "dada") { m.dadas++; m.atletas += l.nAtletas; } else if (l.estado === "nao_dada") m.nao++; else m.porReg++;
   });
   const porPessoa = {}; dadas.forEach(l => { const n = pessoaNome(l.dadaPor) || "Não indicado"; porPessoa[n] = (porPessoa[n] || 0) + 1; });
-  const motivos = {}; nao.forEach(l => { const m = l.motivo || "Outro"; motivos[m] = (motivos[m] || 0) + 1; });
+  const motivos = {}; nao.forEach(l => { const m = motivoTxt(l) || "Outro"; motivos[m] = (motivos[m] || 0) + 1; });
   const temas = {}; regs.filter(r => r.estado === "dada").forEach(r => { const l = temasDe(r); (l.length ? l.map(nomeTema) : ["Sem tema"]).forEach(t => temas[t] = (temas[t] || 0) + 1); });
   const ativas = Object.values(EQ()).filter(e => e.ativa !== false);
   const modalidadesAbr = [...new Set(ativas.map(e => e.modalidade))].sort();
@@ -552,7 +552,8 @@ function viewRelatorio() {
   if (!Object.keys(R.porMod).length) html += `<tr><td colspan="4" class="m">Sem sessões neste período.</td></tr>`;
   html += `</tbody></table></div></section>`;
   if (podeEscrever() && R.dadas.length) html += `<section><div class="sec-h"><h2>Quem deu as sessões</h2></div><div class="item">${barras(R.porPessoa, "var(--accent)", R.dadas.length)}</div></section>`;
-  if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div></section>`;
+  if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div>
+    <details class="item"><summary><b>Ver as ${R.nao.length} sessões não realizadas</b></summary>${R.nao.slice().sort((x, y) => x.data.localeCompare(y.data)).map(l => `<div class="row" style="align-items:flex-start"><span>${dataCurta(l.data)} · ${esc(equipaNome(l.equipaId))}</span><span class="m" style="text-align:right">${esc(motivoTxt(l) || "Outro")}</span></div>`).join("")}</details></section>`;
   if (R.porReg.length && podeEscrever()) html += `<section><div class="sec-h"><h2>Por registar</h2></div><div class="list">${R.porReg.map(p => `<div class="item"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}" style="justify-self:start">Registar</button></div>`).join("")}</div></section>`;
   if (eDono()) {
     const feitas = R.tarefas.filter(t => t.feito).length;
@@ -581,7 +582,7 @@ function textoRelatorio() {
     L.push("", `Reuniões: ${R.reun.length}` + (R.tarefas.length ? ` · tarefas concluídas ${R.tarefas.filter(t => t.feito).length} de ${R.tarefas.length}` : ""));
     R.reun.forEach(r => L.push(`• ${dataCurta(r.data)} (${r.tipo === "online" ? "online" : "presencial"})${r.objetivos ? ": " + r.objetivos.replace(/\s+/g, " ") : ""}`));
   }
-  if (R.nao.length) { L.push("", "Motivos das não realizadas:"); Object.entries(R.motivos).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
+  if (R.nao.length) { L.push("", "Motivos das não realizadas:"); Object.entries(R.motivos).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); L.push("", "Sessões não realizadas:"); R.nao.slice().sort((x, y) => x.data.localeCompare(y.data)).forEach(l => L.push(`• ${dataCurta(l.data)} · ${equipaNome(l.equipaId)}: ${motivoTxt(l) || "Outro"}`)); }
   return L.join("\n");
 }
 
@@ -596,7 +597,7 @@ function viewHoje() {
   const dadas = doMes.filter(s => s.estado === "dada"), nao = doMes.filter(s => s.estado === "nao_dada");
   const media = dadas.length ? Math.round(dadas.reduce((a, s) => a + (+s.nAtletas || 0), 0) / dadas.length) : 0;
   const pct = doMes.length ? Math.round(dadas.length / doMes.length * 100) : 0;
-  const motivos = {}; nao.forEach(s => motivos[s.motivo || "Outro"] = (motivos[s.motivo || "Outro"] || 0) + 1);
+  const motivos = {}; nao.forEach(s => { const m = motivoTxt(s) || "Outro"; motivos[m] = (motivos[m] || 0) + 1; });
 
   // Semana corrente (ou outra, com ‹ ›): o que foi dado, o que não foi e porquê, e o que falta
   const seg = somaDias(hoje, -((dow + 6) % 7) + hojeOffset * 7), dom = somaDias(seg, 6);
