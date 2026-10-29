@@ -794,7 +794,7 @@ function itemExercicio(e) {
   return `<button class="item" data-act="verExercicio" data-id="${e.id}">
     <div class="row"><span class="t">${esc(e.nome)}</span>${chipTema(e.tema)}</div>
     <span class="m">${esc((e.descricao || "").slice(0, 110))}${(e.descricao || "").length > 110 ? "…" : ""}</span>
-    <span class="m">${e.duracao ? e.duracao + " min" : ""}${videosDe(e).length ? " · " + (videosDe(e).length > 1 ? videosDe(e).length + " vídeos" : "tem vídeo") : ""}</span></button>`;
+    <span class="m">${videosDe(e).length ? (videosDe(e).length > 1 ? videosDe(e).length + " vídeos" : "tem vídeo") : ""}</span></button>`;
 }
 function viewExercicios() {
   if (!podeEscrever()) subExe = "exercicios";
@@ -816,7 +816,7 @@ function viewListaExercicios() {
 function verExercicio(id) {
   const e = { id, ...S.exercicios[id] };
   const el = abrirFolha(`<h2>${esc(e.nome)}</h2>
-    <div class="row"><span class="m">${e.duracao ? e.duracao + " min" : ""}</span>${chipTema(e.tema)}</div>
+    <div class="row">${chipTema(e.tema)}</div>
     ${videosDe(e).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(e)}</div>` : `<span class="m">Ainda sem vídeo.</span>`}
     ${e.descricao ? `<div class="field"><span class="lbl">Como fazer</span><span style="white-space:pre-line">${esc(e.descricao)}</span></div>` : ""}
     ${e.progressao ? `<div class="field"><span class="lbl">Progressão</span><span style="white-space:pre-line">${esc(e.progressao)}</span></div>` : ""}
@@ -832,7 +832,6 @@ function formExercicio(e) {
   const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
     <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
     <div class="field"><label for="xTema">Tema (opcional)</label><select id="xTema"><option value="">Sem tema</option>${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
-    <div class="field"><label for="xDur">Duração (min)</label><input type="number" id="xDur" min="1" max="30" value="${e.duracao || 5}"></div>
     <div class="field"><span class="lbl">Vídeos (YouTube, Instagram, Drive…)</span><span class="m">Pode pôr mais do que um, por exemplo um para cada maneira de fazer.</span><div class="list" id="xVids">${(videosDe(e).length ? videosDe(e) : [{ nome: "", url: "" }]).map(linhaVideo).join("")}</div><button class="btn" id="xAddVid">+ Outro vídeo</button></div>
     <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
     <div class="field"><label for="xProg">Progressão</label><textarea id="xProg">${esc(e.progressao)}</textarea></div>
@@ -841,7 +840,7 @@ function formExercicio(e) {
     const nome = $("#xNome", el).value.trim(); if (!nome) return toast("Escreva o nome do exercício");
     const videos = [...el.querySelectorAll("[data-vid]")].map(r => ({ nome: r.querySelector(".vNome").value.trim(), url: r.querySelector(".vUrl").value.trim() })).filter(v => /^https?:\/\//.test(v.url));
     try {
-      await guardar("exercicios", e.id || novoId("x"), { nome, tema: $("#xTema", el).value, duracao: +$("#xDur", el).value || null, video: videos[0]?.url || "", videos, descricao: $("#xDesc", el).value.trim(), progressao: $("#xProg", el).value.trim() });
+      await guardar("exercicios", e.id || novoId("x"), { nome, tema: $("#xTema", el).value, video: videos[0]?.url || "", videos, descricao: $("#xDesc", el).value.trim(), progressao: $("#xProg", el).value.trim() });
       fecharFolha(); toast("Exercício guardado");
     } catch (err) {}
   });
