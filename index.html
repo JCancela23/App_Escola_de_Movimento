@@ -126,6 +126,13 @@ nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600 }
 input[type=text], input[type=date], input[type=time], input[type=url], input[type=number], input[type=month], input[type=tel], input[type=email], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; min-height: 44px }
 textarea { min-height: 80px; resize: vertical; overflow: hidden }
 textarea.iObs { min-height: 44px }
+.item.blk { border-left: 4px solid var(--accent); background: var(--accent-soft) }
+.item.blk-cont { margin-top: -6px; border-top-left-radius: 0; border-top-right-radius: 0 }
+.blkcab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px }
+.blkcab input { width: 70px }
+.junto { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--accent); font-weight: 600 }
+.blocov { border: 2px solid var(--accent); border-radius: 12px; padding: 8px; display: grid; gap: 6px }
+.blocov > .lblb { font-weight: 700; color: var(--accent); font-size: 14px }
 .seg { display: flex; flex-wrap: wrap; gap: 6px }
 .seg button { flex: 1 1 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-height: 44px; font-weight: 500 }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600 }
@@ -890,11 +897,12 @@ const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]
 const parteDe = i => i.parte === "aquecimento" ? "aquecimento" : "principal";
 function htmlPlano(pl) {
   const itens = (pl.itens || []).filter(i => S.exercicios[i.exercicioId]);
-  const bloco = (k, nome) => { const l = itens.filter(i => parteDe(i) === k); return `<div class="field"><span class="lbl">${nome}</span><div class="list">${l.map((i, n) => { const x = S.exercicios[i.exercicioId]; return `<div class="item">
-      <div class="row"><span class="t">${n + 1}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
+  const bloco = (k, nome) => { const l = itens.filter(i => parteDe(i) === k); let n = 0; return `<div class="field"><span class="lbl">${nome}</span><div class="list">${blocosDe(l).map(b => { const h = b.itens.map(i => cartaoItem(i, ++n)).join(""); return b.itens.length > 1 ? `<div class="blocov"><span class="lblb">🔗 Bloco · ${b.rondas || 1} ronda${(b.rondas || 1) > 1 ? "s" : ""} (fazer seguidos e repetir)</span>${h}</div>` : h; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+  const cartaoItem = (i, n) => { const x = S.exercicios[i.exercicioId]; return `<div class="item">
+      <div class="row"><span class="t">${n}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
       ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
       ${i.obs ? `<span><b>Obs.:</b> ${esc(i.obs)}</span>` : ""}
-      ${videosDe(x).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(x)}</div>` : ""}</div>`; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+      ${videosDe(x).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(x)}</div>` : ""}</div>`; };
   return `${chipTema(temasDe(pl))}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
     ${(pl.material || []).length ? `<div class="field"><span class="lbl">Material</span>${pl.material.filter(m => S.material[m.materialId]).map(m => `<span>• ${esc(S.material[m.materialId].nome)}${m.qtd ? " × " + esc(m.qtd) : ""}</span>`).join("")}</div>` : ""}
     ${pl.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(pl.notas)}</span></div>` : ""}`;
@@ -943,7 +951,9 @@ function optExercicios(sel, tema) {
 }
 function linhaItem(i, tema) {
   return `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
-    <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optExercicios(i.exercicioId, tema)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
+    <div class="blkcab" hidden><span>🔗 Bloco (exercícios seguidos) · Rondas:</span><input type="number" class="iRondas" min="1" max="20" inputmode="numeric" value="${esc(i.rondas || 2)}" aria-label="Número de rondas"></div>
+    <label class="junto"><input type="checkbox" class="iJunto" ${i.junto ? "checked" : ""}> Juntar ao exercício de cima (bloco)</label>
+    <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optExercicios(i.exercicioId, tema)}</select><button class="btn ghost" data-up aria-label="Subir">↑</button><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
     <input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições">
     <textarea class="iObs" rows="1" placeholder="Observações" aria-label="Observações">${esc(i.obs)}</textarea></div>`;
 }
@@ -955,8 +965,36 @@ function ligarEditorItens(el, tema) {
     const a = ev.target.closest("[data-edadd]"); if (a) $("#ed_" + a.dataset.edadd, el).insertAdjacentHTML("beforeend", linhaItem({ parte: a.dataset.edadd }, tema()));
     const r = ev.target.closest("[data-item] [data-rm]"); if (r) r.closest("[data-item]").remove();
   });
+  ligarBlocos(el);
 }
-const lerItens = el => [...el.querySelectorAll("[data-item]")].map(r => ({ parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() })).filter(i => i.exercicioId);
+// Blocos: um exercício com "Juntar ao de cima" fica no mesmo bloco que o anterior; o 1.º do bloco guarda as rondas
+function atualizarBlocos(el) {
+  el.querySelectorAll(".list").forEach(l => {
+    const rs = [...l.children].filter(r => r.matches("[data-item]"));
+    rs.forEach((r, n) => {
+      const j = r.querySelector(".iJunto"), seg = rs[n + 1]?.querySelector(".iJunto")?.checked;
+      r.querySelector(".junto").hidden = n === 0; if (n === 0) j.checked = false;
+      const dentro = j.checked || seg;
+      r.classList.toggle("blk", !!dentro); r.classList.toggle("blk-cont", !!j.checked);
+      r.querySelector(".blkcab").hidden = !(seg && !j.checked);
+    });
+  });
+}
+function ligarBlocos(el) {
+  el.addEventListener("click", ev => {
+    const u = ev.target.closest("[data-item] [data-up]"); if (u) { const r = u.closest("[data-item]"), a = r.previousElementSibling; if (a?.matches("[data-item]")) a.before(r); }
+    setTimeout(() => atualizarBlocos(el));
+  });
+  el.addEventListener("change", ev => { if (ev.target.matches(".iJunto")) atualizarBlocos(el); });
+  atualizarBlocos(el);
+}
+const lerItens = el => { atualizarBlocos(el); return [...el.querySelectorAll("[data-item]")].map(r => {
+  const it = { parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() };
+  if (r.querySelector(".iJunto").checked) it.junto = true;
+  if (!r.querySelector(".blkcab").hidden) it.rondas = Math.max(1, +r.querySelector(".iRondas").value || 2);
+  return it; }).filter(i => i.exercicioId); };
+// agrupa itens seguidos em blocos [{itens, rondas}]
+function blocosDe(l) { const out = []; l.forEach(i => { if (i.junto && out.length) out[out.length - 1].itens.push(i); else out.push({ itens: [i], rondas: i.rondas }); }); return out; }
 
 // op: { semana, tema, nome, depois } quando o plano é criado ao preparar o mês
 function formPlano(id, op = {}) {
@@ -964,10 +1002,7 @@ function formPlano(id, op = {}) {
   const temas = (temasDe(pl).length ? temasDe(pl) : op.temas || temasDoMes(mesKey(new Date()))).slice(); if (!temas.length) temas.push("saltar");
   const exs = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)), mats = sorted(S.material, (a, b) => a.nome.localeCompare(b.nome));
   const optEx = sel => optExercicios(sel, temas);
-  const linhaI = i => `<div class="item" style="padding:8px 10px" data-item data-parte="${parteDe(i)}">
-      <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optEx(i.exercicioId)}</select><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
-      <div class="row"><input type="text" class="iDose" value="${esc(i.dose)}" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições"></div>
-      <textarea class="iObs" rows="1" placeholder="Observações" aria-label="Observações">${esc(i.obs)}</textarea></div>`;
+  const linhaI = i => linhaItem(i, temas);
   const linhaM = m => `<div class="row" data-mat><select class="mId" aria-label="Material" style="flex:2"><option value="">Escolher material</option>${mats.map(x => `<option value="${x.id}" ${x.id === m.materialId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select><input type="text" class="mQtd" value="${esc(m.qtd)}" placeholder="Qtd." aria-label="Quantidade" style="flex:1"><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>`;
   const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
     <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.legenda ? `<span class="m">${esc(op.legenda)}</span>` : ""}${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
@@ -981,10 +1016,11 @@ function formPlano(id, op = {}) {
   el.querySelectorAll("[data-addparte]").forEach(b => b.addEventListener("click", () => $("#pl_" + b.dataset.addparte, el).insertAdjacentHTML("beforeend", linhaI({ parte: b.dataset.addparte }))));
   $("#plAddM", el)?.addEventListener("click", () => $("#plMat", el).insertAdjacentHTML("beforeend", linhaM({})));
   el.addEventListener("click", ev => { const b = ev.target.closest("[data-rm]"); if (b) b.closest("[data-item],[data-mat]").remove(); });
+  ligarBlocos(el);
   $("#plOk", el).addEventListener("click", async () => {
     const nome = $("#plNome", el).value.trim(); if (!nome) return toast("Dê um nome ao plano");
     const dados = { nome, tema: temas[0], temas: temas.slice(), notas: $("#plNotas", el).value.trim(),
-      itens: [...el.querySelectorAll("[data-item]")].map(r => ({ parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() })).filter(i => i.exercicioId),
+      itens: lerItens(el),
       material: [...el.querySelectorAll("[data-mat]")].map(r => ({ materialId: r.querySelector(".mId").value, qtd: r.querySelector(".mQtd").value.trim() })).filter(m => m.materialId) };
     const pid = id || novoId("pl");
     try {
