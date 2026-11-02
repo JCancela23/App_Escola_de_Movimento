@@ -139,6 +139,7 @@ textarea.iObs { min-height: 44px }
 .aval { display: grid; gap: 6px }
 .aval .who { display: flex; justify-content: space-between; gap: 8px }
 .aval .prev { font-size: 12px; color: var(--muted) }
+.linkbtn { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; font-weight: 600 }
 .dist { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--line); gap: 2px }
 .dist i { display: grid; place-items: center; font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--fg); min-width: 0; overflow: hidden }
 .scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px }
@@ -1050,12 +1051,13 @@ function viewAvaliacoes() {
   if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Escreva o nome abaixo e toque em Adicionar.</div>`;
   atletas.forEach(a => {
     const v = atual.resultados?.[a.id], p = anterior[a.id];
-    html += `<div class="item aval"><div class="who"><span class="t">${esc(a.nome)}</span><span class="prev">${atual.datas?.[a.id] && atual.datas[a.id] !== avalSel.data ? `avaliado a ${dataCurta(atual.datas[a.id]).slice(4)}` : ""}${p ? ` · mês anterior: ${p}` : ""}</span></div>
+    html += `<div class="item aval"><div class="who"><button class="t linkbtn" data-act="atleta" data-id="${a.id}" aria-label="Editar ${esc(a.nome)}">${esc(a.nome)} <span class="m" aria-hidden="true">✎</span></button><span class="prev">${atual.datas?.[a.id] && atual.datas[a.id] !== avalSel.data ? `avaliado a ${dataCurta(atual.datas[a.id]).slice(4)}` : ""}${p ? ` · mês anterior: ${p}` : ""}</span></div>
       <div class="scale" data-atleta="${a.id}" style="grid-template-columns:repeat(${Math.max(niv.length, 2)},1fr)">${niv.map((d, i) => `<button data-n="${i + 1}" aria-pressed="${v === i + 1}" aria-label="${i + 1}: ${esc(d)}" title="${esc(d)}">${i + 1}</button>`).join("")}</div></div>`;
   });
   html += `</div>
     <div class="row"><input type="text" id="aNovo1" placeholder="Atleta que não está na lista" aria-label="Nome do atleta a adicionar" style="flex:1;min-width:0"><button class="btn primary" id="aAdd1">Adicionar</button></div>
     <div class="field"><label for="aObs">Observações da avaliação</label><textarea id="aObs">${esc(atual.obs)}</textarea></div>
+    ${atletas.length ? `<button class="btn ghost" data-act="moverAtletas" style="justify-self:start">Mover atletas desta equipa para outra</button>` : ""}
     <details><summary class="btn ghost" style="display:inline-block">Colar vários nomes de uma vez</summary>
       <div class="field" style="margin-top:8px"><textarea id="aNovos" placeholder="Um nome por linha"></textarea><button class="btn" id="aAdd">Adicionar à equipa</button></div></details>
   </section>
@@ -1063,6 +1065,48 @@ function viewAvaliacoes() {
     <span class="m">Só se avalia depois de pelo menos 2 sessões realizadas do tema. Conta o que está registado na app.</span>
     <div class="item">${prontas.map(({ e, n }) => `<div class="row"><span>${esc(e.modalidade)} ${esc(e.escalao)}</span><span class="${n >= 2 ? "ok" : "m"}" style="flex:none">${n >= 2 ? `✓ pronta (${n} sessões)` : `${n} de 2 sessões`}</span></div>`).join("")}</div></section>`;
   return html + viewMetricas() + viewEvolucao();
+}
+// corrigir atletas: nome, equipa (as notas já dadas vão com o atleta) ou apagar
+async function mudarEquipaAtleta(aid, novaEq) {
+  const a = S.atletas[aid]; if (!a || a.equipaId === novaEq) return;
+  for (const [id, av] of Object.entries(S.avaliacoes)) {
+    if (av.equipaId !== a.equipaId || !av.resultados?.[aid]) continue;
+    const nid = `${novaEq}_${av.teste || av.tema}_${av.mes}`, destino = JSON.parse(JSON.stringify(S.avaliacoes[nid] || { equipaId: novaEq, teste: av.teste, tema: av.tema, mes: av.mes, data: av.data, resultados: {}, datas: {}, obs: "" }));
+    destino.resultados[aid] = av.resultados[aid]; if (av.datas?.[aid]) (destino.datas = destino.datas || {})[aid] = av.datas[aid];
+    const origem = JSON.parse(JSON.stringify(av)); delete origem.resultados[aid]; if (origem.datas) delete origem.datas[aid];
+    await guardar("avaliacoes", nid, destino); await guardar("avaliacoes", id, origem);
+  }
+  await guardar("atletas", aid, { ...a, equipaId: novaEq });
+}
+const optEquipas = sel => sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade) || (a.escalao || "").localeCompare(b.escalao || "")).map(e => `<option value="${e.id}" ${e.id === sel ? "selected" : ""}>${esc(equipaNome(e.id))}</option>`).join("");
+function formAtleta(aid) {
+  const a = S.atletas[aid]; if (!a) return;
+  const el = abrirFolha(`<h2>Atleta</h2>
+    <div class="field"><label for="atNome">Nome</label><input type="text" id="atNome" value="${esc(a.nome)}"></div>
+    <div class="field"><label for="atEq">Equipa</label><select id="atEq">${optEquipas(a.equipaId)}</select><span class="m">Se mudar de equipa, as notas que já tem passam com ele.</span></div>
+    <div class="actions"><button class="btn danger" id="atDel">Apagar</button><button class="btn" data-close>Cancelar</button><button class="btn primary" id="atOk">Guardar</button></div>`);
+  $("#atOk", el).addEventListener("click", async () => {
+    const nome = $("#atNome", el).value.trim(); if (!nome) return toast("Escreva o nome");
+    try { if (nome !== a.nome) await guardar("atletas", aid, { ...a, nome }); await mudarEquipaAtleta(aid, $("#atEq", el).value); fecharFolha(); toast("Atleta guardado"); render(); } catch (e) {}
+  });
+  $("#atDel", el).addEventListener("click", ev => { const b = ev.currentTarget; if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; return; }
+    apagar("atletas", aid); fecharFolha(); toast("Atleta apagado"); });
+}
+function formMoverAtletas() {
+  const lista = sorted(S.atletas, (a, b) => a.nome.localeCompare(b.nome)).filter(a => a.equipaId === avalSel.equipaId);
+  const el = abrirFolha(`<h2>Mover atletas</h2><span class="m">De ${esc(equipaNome(avalSel.equipaId))} para outra equipa. As notas que já têm passam com eles.</span>
+    <div class="field"><label for="mvEq">Para</label><select id="mvEq">${optEquipas("")}</select></div>
+    <div class="row" style="justify-content:flex-start"><button class="btn ghost" id="mvTodos">Marcar todos</button><button class="btn ghost" id="mvNenhum">Nenhum</button></div>
+    <div class="list">${lista.map(a => `<label class="item" style="grid-template-columns:auto 1fr;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="${a.id}" checked style="width:22px;height:22px"><span>${esc(a.nome)}</span></label>`).join("")}</div>
+    <div class="actions"><button class="btn" data-close>Cancelar</button><button class="btn primary" id="mvOk">Mover</button></div>`);
+  $("#mvEq", el).value = Object.keys(EQ()).find(id => id !== avalSel.equipaId) || "";
+  $("#mvTodos", el).addEventListener("click", () => el.querySelectorAll(".list input").forEach(c => c.checked = true));
+  $("#mvNenhum", el).addEventListener("click", () => el.querySelectorAll(".list input").forEach(c => c.checked = false));
+  $("#mvOk", el).addEventListener("click", async () => {
+    const ids = [...el.querySelectorAll(".list input:checked")].map(c => c.value), dest = $("#mvEq", el).value;
+    if (!ids.length) return toast("Escolha pelo menos um atleta"); if (dest === avalSel.equipaId) return toast("Escolha outra equipa");
+    try { for (const aid of ids) await mudarEquipaAtleta(aid, dest); fecharFolha(); toast(ids.length + " atleta(s) movidos para " + equipaNome(dest)); avalSel.equipaId = dest; render(); } catch (e) {}
+  });
 }
 function formTeste(id) {
   const t = id ? JSON.parse(JSON.stringify(testes()[id])) : { tema: TEMAS_AVALIADOS[0], nome: "", protocolo: "", niveis: ["", "", ""] };
@@ -1679,7 +1723,7 @@ $("#view").addEventListener("click", e => {
     atraso: () => abrirAtraso(),
     planoSessao: () => verPlanoSessao(id, a.dataset.data), verPlano: () => verPlano(id), novoPlano: () => formPlano(),
     novoMaterial: () => formMaterial(), editMaterial: () => formMaterial(id),
-    verEquipa: () => verEquipa(id),
+    verEquipa: () => verEquipa(id), atleta: () => formAtleta(id), moverAtletas: () => formMoverAtletas(),
     reuniao: () => formReuniao(id),
     registarPrev: () => { const pv = previstas(a.dataset.data, a.dataset.data).find(x => x.equipaId === id) || {}; formSessao({ equipaId: id, data: a.dataset.data, hora: pv.hora, local: pv.local, duracao: pv.duracao }); },
     alterar: () => formAlteracao(id, a.dataset.data),
