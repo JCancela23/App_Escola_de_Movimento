@@ -378,7 +378,16 @@ function previstas(de, ate) {
   return out.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 }
 function sessaoDe(p) { return Object.entries(S.sessoes).map(([id, v]) => ({ id, ...v })).find(s => s.equipaId === p.equipaId && s.data === p.data); }
-function linhaPlano(eid, data) { const pl = planoDaSessao(eid, data); return pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""; }
+// Plano de uma sessão registada: o que foi carregado no registo; nas antigas, o plano com os mesmos exercícios
+function planoRegistadoId(s) {
+  if (s.planoId && S.planos[s.planoId]) return s.planoId;
+  const ex = new Set((s.itens || []).map(i => i.exercicioId).concat(s.exercicios || []));
+  if (!ex.size) return null;
+  let melhor = null, nota = 0;
+  Object.entries(S.planos).forEach(([id, pl]) => { const p = new Set((pl.itens || []).map(i => i.exercicioId)); const comuns = [...p].filter(x => ex.has(x)).length, j = comuns / new Set([...p, ...ex]).size; if (j > nota) { nota = j; melhor = id; } });
+  return nota >= 0.6 ? melhor : null;
+}
+function linhaPlano(eid, data) { const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === data && x.estado === "dada"), rid = reg && planoRegistadoId(reg); const pl = rid ? S.planos[rid] : planoDaSessao(eid, data); return pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""; }
 function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
   const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Realizada · ${s.nAtletas}</span>` : `<span class="chip bad">Não realizada</span>`)
@@ -729,6 +738,7 @@ function formSessao(s) {
   if (!f.itens?.length && f.exercicios?.length) f.itens = f.exercicios.map(x => ({ parte: "principal", exercicioId: x }));
   const plS = !s?.id && planoDaSessao(f.equipaId, f.data);
   if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (temasDe(plS).length) f.temas = temasDe(plS).slice(); }
+  f.planoId = s?.id ? planoRegistadoId(s) : plS?.id || null;
   let nota = s?.id ? (S.notas[s.id]?.texto || "") : "";
 
   const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>${novo ? "" : quemFoi(S.sessoes[s.id])}
@@ -744,7 +754,7 @@ function formSessao(s) {
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
       <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="fTema">${segTemas(f.temas)}</div></div>
       <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
-        <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join("")}</select></div>
+        <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === f.planoId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
       <div id="fItens">${editorItens(f.itens, f.temas)}</div>
       <div class="field"><label for="fResumo">Resumo (visível para treinadores e pais)</label><textarea rows="1" id="fResumo" placeholder="Ex.: Boa adesão, rever receção dos saltos">${esc(f.resumo)}</textarea></div>
     </div>
@@ -762,7 +772,7 @@ function formSessao(s) {
   const vis = () => { $("#blocoDada", el).hidden = f.estado !== "dada"; $("#blocoNao", el).hidden = f.estado === "dada"; };
   ligarEditorItens(el, () => f.temas);
   $("#fPlano", el).addEventListener("change", ev => {
-    const pl = S.planos[ev.target.value]; if (!pl) return;
+    const pl = S.planos[ev.target.value]; f.planoId = pl ? ev.target.value : null; if (!pl) return;
     if (temasDe(pl).length) { f.temas.splice(0, f.temas.length, ...temasDe(pl)); $("#fTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(f.temas.includes(b.dataset.v)))); }
     $("#fItens", el).innerHTML = editorItens(pl.itens, f.temas); toast("Exercícios do plano carregados");
   });
@@ -785,7 +795,7 @@ function formSessao(s) {
     const dados = {
       data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.temas[0], temas: f.temas.slice(),
       nAtletas: f.estado === "dada" ? f.nAtletas : 0, correu: f.estado === "dada" ? f.correu : null,
-      itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
+      planoId: f.estado === "dada" ? f.planoId || null : null, itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
       motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), motivoDetalhe: f.estado !== "dada" && (f.motivo || "Outro") === "Outro" ? detalhe : "", criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
     };
     if (s?.exemplo) dados.exemplo = true;
@@ -810,6 +820,7 @@ function verSessao(id) {
   abrirFolha(`<h2>${esc(equipaNome(s.equipaId))}</h2>
     <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " · " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${s.duracao ? " · " + s.duracao + " min" : ""}</span>${chipTema(temasDe(s))}</div>
     ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
+      ${planoRegistadoId(s) ? `<div class="field"><span class="lbl">Plano</span>${linhaPlano(s.equipaId, s.data)}</div>` : ""}
       ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
       ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
       : `<div class="field"><span class="lbl">Não foi realizada</span><span>${esc(motivoTxt(s))}</span></div>`}
