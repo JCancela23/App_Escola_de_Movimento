@@ -92,6 +92,8 @@ button.item:hover { border-color: var(--muted) }
 .wk-card.off { opacity: .55 }
 .wk-card.off .wk-mod, .wk-card.off .wk-hora { text-decoration: line-through }
 .wk-card .m { font-size: 12.5px }
+.plnome { font-weight: 700; color: var(--accent) }
+.wk-card .plnome { font-size: 12.5px; line-height: 1.25 }
 .wk-hora { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 16px }
 .wk-mod { font-weight: 700; color: var(--c); line-height: 1.2; overflow-wrap: anywhere }
 .wk-loc { font-size: 13.5px; overflow-wrap: anywhere }
@@ -376,6 +378,7 @@ function previstas(de, ate) {
   return out.sort((a, b) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora));
 }
 function sessaoDe(p) { return Object.entries(S.sessoes).map(([id, v]) => ({ id, ...v })).find(s => s.equipaId === p.equipaId && s.data === p.data); }
+function linhaPlano(eid, data) { const pl = planoDaSessao(eid, data); return pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""; }
 function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
   const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Realizada · ${s.nAtletas}</span>` : `<span class="chip bad">Não realizada</span>`)
@@ -385,6 +388,7 @@ function itemPrevista(p) {
   const extra = p.mudada && !p.cancelada ? ` · mudada de ${dataCurta(p.mudada)}${p.motivo ? " (" + esc(motivoTxt(p)) + ")" : ""}` : p.cancelada ? ` · ${esc(motivoTxt(p))}` : "";
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
+    ${!p.cancelada && !(s && s.estado === "nao_dada") ? linhaPlano(p.equipaId, p.data) : ""}
     <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>Sessão ${numeroNoMes(p.equipaId, p.data)}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
     ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
       ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
@@ -708,6 +712,7 @@ function itemSessao(s) {
   return `<button class="item" data-act="verSessao" data-id="${s.id}">
     <div class="row"><span class="t">${esc(equipaNome(s.equipaId))}</span>${estado}</div>
     <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${pessoaNome(s.dadaPor) ? " · " + esc(pessoaNome(s.dadaPor)) : ""}${s.exemplo ? " · exemplo" : ""}</span>${chipTema(temasDe(s))}</div>
+    ${s.estado === "dada" ? linhaPlano(s.equipaId, s.data) : ""}
     ${linha ? `<span class="m">${linha}</span>` : ""}</button>`;
 }
 
@@ -1429,6 +1434,7 @@ function viewSemana() {
         <span class="wk-hora">${esc(horaStd(p.hora) || "—")}<span class="m">–${minFim(p.hora, p.duracao)}</span></span>
         <span class="wk-mod">${esc(e.modalidade || "")}</span>${e.escalao ? `<span class="m">${esc(e.escalao)}</span>` : ""}
         <span class="wk-loc">${esc(p.local || "Local por definir")}</span>
+        ${p.cancelada || s?.estado === "nao_dada" ? "" : linhaPlano(p.equipaId, p.data)}
         <span class="row" style="gap:6px;justify-content:flex-start;flex-wrap:wrap"><span class="m">${p.duracao}'</span>${pf ? `<span class="wk-pf" style="background:${corPF(pf)}">${esc(primeiroNome(pf))}</span>` : `<span class="wk-st warn">sem PF</span>`}${estado}</span>
         ${p.mudada ? `<span class="m">mudada de ${dataCurta(p.mudada)}</span>` : ""}</button>`;
     });
