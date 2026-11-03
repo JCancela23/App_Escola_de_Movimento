@@ -389,7 +389,7 @@ function itemPrevista(p) {
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
     ${!p.cancelada && !(s && s.estado === "nao_dada") ? linhaPlano(p.equipaId, p.data) : ""}
-    <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>Sessão ${numeroNoMes(p.equipaId, p.data)}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
+    <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>${sessaoDoTema(p.equipaId, p.data).rotulo}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
     ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
       ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
       ${s ? "" : `<button class="btn ghost" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">Alterar</button>`}
@@ -893,9 +893,24 @@ function numeroNoMes(equipaId, data) {
 function sessoesPorEquipaNoMes(k) {
   const c = {}; previstas(k + "-01", fimDoMes(k)).forEach(p => { if (!p.cancelada) c[p.equipaId] = (c[p.equipaId] || 0) + 1; }); return c;
 }
+// Sequência do tema: quando o tema volta (ou continua) noutro mês da mesma época, cada escalão continua
+// a partir da última sessão que realizou. Planos por dar dos meses anteriores do mesmo tema passam à frente.
+function sessaoDoTema(equipaId, data) {
+  const k = data.slice(0, 7), tema = temaDoMes(k), n = numeroNoMes(equipaId, data);
+  const y = +k.slice(0, 4), m = +k.slice(5), ini = (m >= 8 ? y : y - 1) + "-08";
+  let fila = [];
+  if (tema) Object.keys(S.plano).filter(x => /^\d{4}-\d{2}$/.test(x) && x >= ini && x < k && temaDoMes(x) === tema).sort().forEach(x => {
+    (S.plano[x].sessoes || []).forEach((id, i) => fila.push({ id, mes: x, n: i + 1 }));
+    const feitas = Object.values(S.sessoes).filter(z => z.equipaId === equipaId && z.data.startsWith(x) && z.estado === "dada").length;
+    fila = fila.slice(feitas);
+  });
+  const atrasadas = fila.length;
+  (S.plano[k]?.sessoes || []).forEach((id, i) => fila.push({ id, mes: k, n: i + 1 }));
+  const f = fila[n - 1];
+  return { id: f?.id || null, rotulo: f ? (f.mes === k ? "Sessão " + f.n : `Sessão ${f.n} de ${MESES[+f.mes.slice(5) - 1].toLowerCase()}`) : "Sessão " + (n - atrasadas) };
+}
 function planoDaSessao(equipaId, data) {
-  const seq = S.plano[data.slice(0, 7)]?.sessoes || [];
-  const id = S.planeadas[equipaId + "_" + data]?.planoId || seq[numeroNoMes(equipaId, data) - 1] || S.semanas[segundaDe(data)]?.planoId;
+  const id = S.planeadas[equipaId + "_" + data]?.planoId || sessaoDoTema(equipaId, data).id || S.semanas[segundaDe(data)]?.planoId;
   return id && S.planos[id] ? { id, ...S.planos[id] } : null;
 }
 const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]];
