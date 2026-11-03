@@ -94,6 +94,8 @@ button.item:hover { border-color: var(--muted) }
 .wk-card .m { font-size: 12.5px }
 .plnome { font-weight: 700; color: var(--accent) }
 .wk-card .plnome { font-size: 12.5px; line-height: 1.25 }
+.plnome.aval { color: var(--warn, #b26a00) }
+.avrow select { width: auto; flex: none; min-height: 40px; padding: 6px 10px }
 .wk-hora { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 16px }
 .wk-mod { font-weight: 700; color: var(--c); line-height: 1.2; overflow-wrap: anywhere }
 .wk-loc { font-size: 13.5px; overflow-wrap: anywhere }
@@ -258,7 +260,7 @@ let relPeriodo = "semana", relOffset = 0;
 let db = null, demo = false;
 let role = { nivel: "view", nome: "Consulta" }; // view | write | admin
 let tab = "hoje", filtroTema = "todos", filtroEquipa = "todas";
-let avalSel = { equipaId: null, teste: null, data: hojeISO(), get mes() { return this.data.slice(0, 7); } };
+let avalSel = { equipaId: null, teste: null, momento: 1, data: hojeISO(), get mes() { return this.data.slice(0, 7); } };
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -387,7 +389,23 @@ function planoRegistadoId(s) {
   Object.entries(S.planos).forEach(([id, pl]) => { const p = new Set((pl.itens || []).map(i => i.exercicioId)); const comuns = [...p].filter(x => ex.has(x)).length, j = comuns / new Set([...p, ...ex]).size; if (j > nota) { nota = j; melhor = id; } });
   return nota >= 0.6 ? melhor : null;
 }
-function linhaPlano(eid, data) { const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === data && x.estado === "dada"), rid = reg && planoRegistadoId(reg); const pl = rid ? S.planos[rid] : planoDaSessao(eid, data); return pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""; }
+// Avaliação marcada numa sessão: [{teste, momento}] na sessão registada ou, antes de registar, em planeadas
+const momentoDe = a => +a.momento || 1, MOMENTOS = [1, 2];
+function rotuloAval(x) { return `📝 Avaliação ${testes()[x.teste]?.nome || x.teste} · ${momentoDe(x)}.º momento`; }
+function avalDaSessao(eid, data) { const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === data); return reg ? (reg.estado === "dada" ? reg.avaliacao || [] : []) : S.planeadas[eid + "_" + data]?.avaliacao || []; }
+// sessão só de avaliação (sem plano escolhido): não gasta um plano da sequência do mês
+function sessaoSoAval(eid, d) {
+  const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === d && x.estado === "dada");
+  if (reg) return !!reg.avaliacao?.length && !planoRegistadoId(reg);
+  const pl = S.planeadas[eid + "_" + d]; return !!pl?.avaliacao?.length && !pl.planoId;
+}
+function editorAval(lista) {
+  return `<div class="field"><span class="lbl">Avaliação nesta sessão</span>${Object.entries(testes()).map(([id, t]) => { const x = (lista || []).find(y => y.teste === id);
+    return `<div class="row avrow" data-avt="${id}" style="justify-content:flex-start;gap:10px"><label class="junto" style="flex:1"><input type="checkbox" class="avOn" ${x ? "checked" : ""}> ${esc(t.nome)}</label><select class="avMom" aria-label="Momento da avaliação de ${esc(t.nome)}">${MOMENTOS.map(m => `<option value="${m}" ${momentoDe(x || {}) === m ? "selected" : ""}>${m}.º momento</option>`).join("")}</select></div>`; }).join("")}
+    <span class="m">Se houver tempo, pode juntar na mesma sessão um plano ou exercícios do tema novo.</span></div>`;
+}
+const lerAval = el => [...el.querySelectorAll("[data-avt]")].filter(r => r.querySelector(".avOn").checked).map(r => ({ teste: r.dataset.avt, momento: +r.querySelector(".avMom").value }));
+function linhaPlano(eid, data) { const av = avalDaSessao(eid, data).map(x => `<span class="plnome aval">${esc(rotuloAval(x))}</span>`).join(""); const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === data && x.estado === "dada"), rid = reg && planoRegistadoId(reg); const pl = rid ? S.planos[rid] : reg ? null : planoDaSessao(eid, data); return av + (pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""); }
 function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
   const estado = s ? (s.estado === "dada" ? `<span class="chip ok">Realizada · ${s.nAtletas}</span>` : `<span class="chip bad">Não realizada</span>`)
@@ -398,11 +416,11 @@ function itemPrevista(p) {
   return `<div class="item">
     <div class="row"><span class="t">${esc(e.modalidade)} ${esc(e.escalao)}</span>${estado}</div>
     ${!p.cancelada && !(s && s.estado === "nao_dada") ? linhaPlano(p.equipaId, p.data) : ""}
-    <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") ? `<b>${sessaoDoTema(p.equipaId, p.data).rotulo}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
+    <span class="m">${podeEscrever() && !p.cancelada && !(s && s.estado === "nao_dada") && !sessaoSoAval(p.equipaId, p.data) ? `<b>${sessaoDoTema(p.equipaId, p.data).rotulo}</b> · ` : ""}${esc(s?.hora || p.hora)} · ${esc(s?.local || p.local)}${p.mudouLocal ? " (local alterado)" : ""} · ${s?.duracao || p.duracao} min${pessoaNome(s?.preparador || e.responsavel) ? " · " + esc(pessoaNome(s?.preparador || e.responsavel)) : ""}${extra}${quem}</span>${porque}
     ${podeEscrever() ? `<div class="actions" style="justify-content:flex-start">
       ${s ? `<button class="btn" data-act="verSessao" data-id="${s.id}">Ver registo</button>` : p.cancelada || p.data > hojeISO() ? "" : `<button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}">Registar</button>`}
       ${s ? "" : `<button class="btn ghost" data-act="alterar" data-id="${p.equipaId}" data-data="${p.original}">Alterar</button>`}
-      ${p.cancelada ? "" : planoDaSessao(p.equipaId, p.data) ? `<button class="btn" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Ver plano</button>` : podeGerir() ? `<button class="btn ghost" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Escolher plano</button>` : `<span class="m">Sem plano</span>`}</div>`
+      ${p.cancelada ? "" : planoDaSessao(p.equipaId, p.data) ? `<button class="btn" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Ver plano</button>` : podeGerir() ? `<button class="btn ghost" data-act="planoSessao" data-id="${p.equipaId}" data-data="${p.data}">Plano ou avaliação</button>` : `<span class="m">Sem plano</span>`}</div>`
       : s ? `<button class="btn ghost" data-act="verSessao" data-id="${s.id}" style="justify-self:start">Ver sessão</button>` : ""}
   </div>`;
 }
@@ -739,6 +757,7 @@ function formSessao(s) {
   const plS = !s?.id && planoDaSessao(f.equipaId, f.data);
   if (plS) { f.itens = JSON.parse(JSON.stringify(plS.itens || [])); if (temasDe(plS).length) f.temas = temasDe(plS).slice(); }
   f.planoId = s?.id ? planoRegistadoId(s) : plS?.id || null;
+  f.avaliacao = (s?.id ? s.avaliacao : S.planeadas[f.equipaId + "_" + f.data]?.avaliacao) || [];
   let nota = s?.id ? (S.notas[s.id]?.texto || "") : "";
 
   const el = abrirFolha(`<h2>${novo ? "Registar sessão" : "Editar sessão"}</h2>${novo ? "" : quemFoi(S.sessoes[s.id])}
@@ -753,6 +772,7 @@ function formSessao(s) {
       <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><output id="fN">${f.nAtletas}</output><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
       <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="fTema">${segTemas(f.temas)}</div></div>
+      ${editorAval(f.avaliacao)}
       <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
         <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === f.planoId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
       <div id="fItens">${editorItens(f.itens, f.temas)}</div>
@@ -795,7 +815,7 @@ function formSessao(s) {
     const dados = {
       data: $("#fData", el).value || hoje, equipaId: $("#fEq", el).value, estado: f.estado, tema: f.temas[0], temas: f.temas.slice(),
       nAtletas: f.estado === "dada" ? f.nAtletas : 0, correu: f.estado === "dada" ? f.correu : null,
-      planoId: f.estado === "dada" ? f.planoId || null : null, itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
+      planoId: f.estado === "dada" ? f.planoId || null : null, avaliacao: f.estado === "dada" ? lerAval(el) : [], itens: f.estado === "dada" ? lerItens(el) : [], exercicios: f.estado === "dada" ? [...new Set(lerItens(el).map(i => i.exercicioId))] : [], resumo: f.estado === "dada" ? $("#fResumo", el).value.trim() : "",
       motivo: f.estado === "dada" ? "" : (f.motivo || "Outro"), motivoDetalhe: f.estado !== "dada" && (f.motivo || "Outro") === "Outro" ? detalhe : "", criadoEm: s?.criadoEm || Date.now(), autor: meuId || null, dadaPor: $("#fPor", el).value || null, hora: $("#fHora", el).value.trim(), local: $("#fLocal", el).value.trim(), duracao: +$("#fDur", el).value || null
     };
     if (s?.exemplo) dados.exemplo = true;
@@ -820,7 +840,7 @@ function verSessao(id) {
   abrirFolha(`<h2>${esc(equipaNome(s.equipaId))}</h2>
     <div class="row"><span class="m">${dataCurta(s.data)}${s.hora ? " · " + esc(s.hora) : ""}${s.local ? " · " + esc(s.local) : ""}${s.duracao ? " · " + s.duracao + " min" : ""}</span>${chipTema(temasDe(s))}</div>
     ${s.estado === "dada" ? `<div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><b>${s.nAtletas}</b><span>Atletas</span></div><div class="stat"><b style="font-size:22px">${CORREU.find(c => c.v === s.correu)?.t || "—"}</b><span>Como correu</span></div></div>
-      ${planoRegistadoId(s) ? `<div class="field"><span class="lbl">Plano</span>${linhaPlano(s.equipaId, s.data)}</div>` : ""}
+      ${planoRegistadoId(s) || s.avaliacao?.length ? `<div class="field"><span class="lbl">Sessão</span>${linhaPlano(s.equipaId, s.data)}</div>` : ""}
       ${exs.length ? `<div class="field"><span class="lbl">Exercícios</span><span>${exs.map(esc).join(", ")}</span></div>` : ""}
       ${s.resumo ? `<div class="field"><span class="lbl">Resumo</span><span>${esc(s.resumo)}</span></div>` : ""}`
       : `<div class="field"><span class="lbl">Não foi realizada</span><span>${esc(motivoTxt(s))}</span></div>`}
@@ -899,7 +919,7 @@ function numeroNoMes(equipaId, data) {
   const k = data.slice(0, 7), datas = new Set();
   previstas(k + "-01", fimDoMes(k)).forEach(p => { if (p.equipaId === equipaId && !p.cancelada) datas.add(p.data); });
   Object.values(S.sessoes).forEach(x => { if (x.equipaId === equipaId && x.data.startsWith(k)) datas.add(x.data); });
-  return [...datas].filter(d => d < data && Object.values(S.sessoes).find(x => x.equipaId === equipaId && x.data === d)?.estado !== "nao_dada").length + 1;
+  return [...datas].filter(d => d < data && Object.values(S.sessoes).find(x => x.equipaId === equipaId && x.data === d)?.estado !== "nao_dada" && !sessaoSoAval(equipaId, d)).length + 1;
 }
 function sessoesPorEquipaNoMes(k) {
   const c = {}; previstas(k + "-01", fimDoMes(k)).forEach(p => { if (!p.cancelada) c[p.equipaId] = (c[p.equipaId] || 0) + 1; }); return c;
@@ -921,7 +941,7 @@ function sessaoDoTema(equipaId, data) {
   return { id: f?.id || null, rotulo: f ? (f.mes === k ? "Sessão " + f.n : `Sessão ${f.n} de ${MESES[+f.mes.slice(5) - 1].toLowerCase()}`) : "Sessão " + (n - atrasadas) };
 }
 function planoDaSessao(equipaId, data) {
-  const id = S.planeadas[equipaId + "_" + data]?.planoId || sessaoDoTema(equipaId, data).id || S.semanas[segundaDe(data)]?.planoId;
+  const id = S.planeadas[equipaId + "_" + data]?.planoId || (sessaoSoAval(equipaId, data) ? null : sessaoDoTema(equipaId, data).id || S.semanas[segundaDe(data)]?.planoId);
   return id && S.planos[id] ? { id, ...S.planos[id] } : null;
 }
 const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]];
@@ -942,14 +962,18 @@ function verPlanoSessao(eid, data) {
   const pl = planoDaSessao(eid, data), propria = S.planeadas[eid + "_" + data]?.planoId;
   const el = abrirFolha(`<h2>Plano da sessão</h2><span class="m">${esc(equipaNome(eid))} · ${dataCurta(data)}</span>
     ${pl ? `<span class="t">${esc(pl.nome)}</span><span class="m">${propria ? "Escolhido para esta sessão" : "Plano da semana"}</span>${htmlPlano(pl)}` : `<div class="empty">Ainda não há plano para esta sessão.</div>`}
+    ${avalDaSessao(eid, data).map(x => `<span class="plnome aval">${esc(rotuloAval(x))}</span>`).join("")}
+    ${podeGerir() ? editorAval(S.planeadas[eid + "_" + data]?.avaliacao) : ""}
     ${podeGerir() ? `<div class="field"><label for="psSel">Plano desta sessão</label><select id="psSel"><option value="">Usar o plano da semana</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === propria ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>` : ""}
     <div class="actions">${podeGerir() && pl ? `<button class="btn" id="psEdit">Editar plano</button>` : ""}<button class="btn" data-close>Fechar</button></div>`);
-  $("#psSel", el)?.addEventListener("change", async ev => {
-    const id = eid + "_" + data;
-    if (ev.target.value) await guardar("planeadas", id, { planoId: ev.target.value, equipaId: eid, data }).catch(() => {});
-    else if (S.planeadas[id]) await apagar("planeadas", id);
+  const gravarPl = async mud => {
+    const id = eid + "_" + data, novo = { ...(S.planeadas[id] || { equipaId: eid, data }), ...mud };
+    if (!novo.planoId && !(novo.avaliacao || []).length) { if (S.planeadas[id]) await apagar("planeadas", id); }
+    else await guardar("planeadas", id, novo).catch(() => {});
     verPlanoSessao(eid, data);
-  });
+  };
+  $("#psSel", el)?.addEventListener("change", ev => gravarPl({ planoId: ev.target.value || null }));
+  el.querySelectorAll("[data-avt] input, [data-avt] select").forEach(c => c.addEventListener("change", () => gravarPl({ avaliacao: lerAval(el) })));
   $("#psEdit", el)?.addEventListener("click", () => formPlano(pl.id));
 }
 function viewPlanos() {
@@ -1089,7 +1113,11 @@ function formMaterial(id) {
 
 // ---------- AVALIAÇÕES ----------
 let avalPendente = null, avalTimer = null;
-function avalId() { return `${avalSel.equipaId}_${avalSel.teste}_${avalSel.mes}`; }
+// uma avaliação por equipa, teste, momento (1.º/2.º) e época; as antigas sem momento contam como 1.º
+function avalId(eq = avalSel.equipaId, t = avalSel.teste, m = avalSel.momento, ep = epocaDe(avalSel.data)) {
+  const f = Object.entries(S.avaliacoes).find(([id, a]) => a.equipaId === eq && (a.teste || a.tema) === t && momentoDe(a) === m && epocaDe(a.data || a.mes + "-01") === ep);
+  return f ? f[0] : `${eq}_${t}_${ep.replace("/", "-")}_m${m}`;
+}
 function mesAnterior(k) { const [y, m] = k.split("-").map(Number); return mesKey(new Date(y, m - 2, 1)); }
 function viewAvaliacoes() {
   if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}</section>${viewMetricas()}${viewEvolucao()}`;
@@ -1099,7 +1127,7 @@ function viewAvaliacoes() {
   if (!avalSel.equipaId) return `<section><div class="empty">Crie primeiro uma equipa em Mais.</div></section>`;
   const T = TS[avalSel.teste], niv = T.niveis || [];
   const atual = avalPendente && avalPendente.id === avalId() ? avalPendente.dados : (S.avaliacoes[avalId()] || { resultados: {} });
-  const anterior = S.avaliacoes[`${avalSel.equipaId}_${avalSel.teste}_${mesAnterior(avalSel.mes)}`]?.resultados || {};
+  const anterior = avalSel.momento > 1 ? S.avaliacoes[avalId(avalSel.equipaId, avalSel.teste, avalSel.momento - 1)]?.resultados || {} : {};
   const atletas = sorted(S.atletas, (a, b) => a.nome.localeCompare(b.nome)).filter(a => a.equipaId === avalSel.equipaId);
   const feitos = atletas.filter(a => atual.resultados?.[a.id]).length;
 
@@ -1110,6 +1138,7 @@ function viewAvaliacoes() {
     <div class="field"><span class="lbl">Teste</span><div class="seg" id="aTeste">${Object.entries(TS).map(([id, t]) => `<button data-v="${id}" aria-pressed="${id === avalSel.teste}">${esc(t.nome)}</button>`).join("")}</div>${T.exercicio ? `<span class="t">${esc(T.exercicio)}</span>` : ""}
       ${podeGerir() ? `<div class="row" style="justify-content:flex-start"><button class="btn ghost" data-act="teste" data-id="${avalSel.teste}">Editar teste</button><button class="btn ghost" data-act="teste">Novo teste</button></div>` : ""}</div>
     <details class="item"><summary><b>Como se faz</b> <span class="m">· tema ${esc(nomeTema(T.tema))}</span></summary><p style="margin:8px 0 0;white-space:pre-line">${esc(T.protocolo || "")}</p></details>
+    <div class="field"><span class="lbl">Momento</span><div class="seg" id="aMom">${MOMENTOS.map(m => `<button data-v="${m}" aria-pressed="${m === avalSel.momento}">${m}.º momento</button>`).join("")}</div>${avalSel.momento > 1 ? `<span class="m">Ao lado de cada atleta aparece a nota do ${avalSel.momento - 1}.º momento, para comparar.</span>` : ""}</div>
     <div class="row" style="align-items:end"><div class="field" style="flex:1"><label for="aEq">Equipa</label><select id="aEq">${equipas.map(e => `<option value="${e.id}" ${e.id === avalSel.equipaId ? "selected" : ""}>${esc(e.modalidade)} ${esc(e.escalao)}${nTema(e.id) >= 2 ? " ✓" : ""}</option>`).join("")}</select></div>
       <div class="field" style="width:10.5em"><label for="aData">Dia da avaliação</label><input type="date" id="aData" value="${avalSel.data}"></div></div>
     ${(() => { const n = nTema(avalSel.equipaId); return n >= 2 ? `<span class="m ok">✓ Pronta para avaliar: ${n} sessões de ${esc(nomeTema(T.tema))} realizadas.</span>` : `<span class="m warn">Ainda só tem ${n} de 2 sessões de ${esc(nomeTema(T.tema))} registadas como realizadas.</span>`; })()}
@@ -1118,7 +1147,7 @@ function viewAvaliacoes() {
   if (!atletas.length) html += `<div class="empty">Esta equipa ainda não tem atletas. Escreva o nome abaixo e toque em Adicionar.</div>`;
   atletas.forEach(a => {
     const v = atual.resultados?.[a.id], p = anterior[a.id];
-    html += `<div class="item aval"><div class="who"><button class="t linkbtn" data-act="atleta" data-id="${a.id}" aria-label="Editar ${esc(a.nome)}">${esc(a.nome)} <span class="m" aria-hidden="true">✎</span></button><span class="prev">${atual.datas?.[a.id] && atual.datas[a.id] !== avalSel.data ? `avaliado a ${dataCurta(atual.datas[a.id]).slice(4)}` : ""}${p ? ` · mês anterior: ${p}` : ""}</span></div>
+    html += `<div class="item aval"><div class="who"><button class="t linkbtn" data-act="atleta" data-id="${a.id}" aria-label="Editar ${esc(a.nome)}">${esc(a.nome)} <span class="m" aria-hidden="true">✎</span></button><span class="prev">${atual.datas?.[a.id] && atual.datas[a.id] !== avalSel.data ? `avaliado a ${dataCurta(atual.datas[a.id]).slice(4)}` : ""}${p ? ` · ${avalSel.momento - 1}.º momento: ${p}` : ""}</span></div>
       <div class="scale" data-atleta="${a.id}" style="grid-template-columns:repeat(${Math.max(niv.length, 2)},1fr)">${niv.map((d, i) => `<button data-n="${i + 1}" aria-pressed="${v === i + 1}" aria-label="${i + 1}: ${esc(d)}" title="${esc(d)}">${i + 1}</button>`).join("")}</div></div>`;
   });
   html += `</div>
@@ -1138,7 +1167,7 @@ async function mudarEquipaAtleta(aid, novaEq) {
   const a = S.atletas[aid]; if (!a || a.equipaId === novaEq) return;
   for (const [id, av] of Object.entries(S.avaliacoes)) {
     if (av.equipaId !== a.equipaId || !av.resultados?.[aid]) continue;
-    const nid = `${novaEq}_${av.teste || av.tema}_${av.mes}`, destino = JSON.parse(JSON.stringify(S.avaliacoes[nid] || { equipaId: novaEq, teste: av.teste, tema: av.tema, mes: av.mes, data: av.data, resultados: {}, datas: {}, obs: "" }));
+    const nid = avalId(novaEq, av.teste || av.tema, momentoDe(av), epocaDe(av.data || av.mes + "-01")), destino = JSON.parse(JSON.stringify(S.avaliacoes[nid] || { equipaId: novaEq, teste: av.teste, tema: av.tema, momento: momentoDe(av), mes: av.mes, data: av.data, resultados: {}, datas: {}, obs: "" }));
     destino.resultados[aid] = av.resultados[aid]; if (av.datas?.[aid]) (destino.datas = destino.datas || {})[aid] = av.datas[aid];
     const origem = JSON.parse(JSON.stringify(av)); delete origem.resultados[aid]; if (origem.datas) delete origem.datas[aid];
     await guardar("avaliacoes", nid, destino); await guardar("avaliacoes", id, origem);
@@ -1205,6 +1234,20 @@ function metricasAval() {
   });
   return out;
 }
+// 1.º → 2.º momento: só atletas com as duas notas na mesma época
+function compMomentos(tid) {
+  const r = {};
+  Object.values(S.avaliacoes).forEach(a => { if ((a.teste || a.tema) !== tid) return; const eq = EQ()[a.equipaId]; if (!eq) return; const ep = epocaDe(a.data || a.mes + "-01");
+    Object.entries(a.resultados || {}).forEach(([aid, v]) => { if (!v) return; const o = r[aid + "|" + ep] = r[aid + "|" + ep] || { mod: eq.modalidade }; o["m" + momentoDe(a)] = v; if (momentoDe(a) === 2) o.mod = eq.modalidade; }); });
+  const pares = Object.values(r).filter(o => o.m1 && o.m2); if (!pares.length) return "";
+  const num = x => x.toFixed(1).replace(".", ",");
+  const lin = (nome, l) => { const n = l.length, a = l.reduce((x, y) => x + y.m1, 0) / n, b = l.reduce((x, y) => x + y.m2, 0) / n, mel = l.filter(x => x.m2 > x.m1).length, pio = l.filter(x => x.m2 < x.m1).length, d = b - a;
+    return `<div class="row"><span class="t">${esc(nome)}</span><span class="m" style="flex:none">${n} atleta${n === 1 ? "" : "s"}</span></div>
+      <span>Média ${num(a)} → <b>${num(b)}</b> <span class="${d > 0 ? "ok" : d < 0 ? "bad" : "m"}">(${d > 0 ? "+" : ""}${num(d)})</span></span>
+      <span class="m">${Math.round(mel / n * 100)}% melhoraram · ${Math.round((n - mel - pio) / n * 100)}% iguais · ${Math.round(pio / n * 100)}% pioraram</span>`; };
+  const mods = [...new Set(pares.map(x => x.mod))].sort();
+  return `<span class="lbl" style="margin-top:10px">1.º → 2.º momento</span>${lin("Todas as modalidades", pares)}${mods.map(m => lin(m, pares.filter(x => x.mod === m))).join("")}`;
+}
 function viewMetricas() {
   const M = metricasAval(), TS = testes(); if (!Object.keys(M).length) return "";
   const linha = (nome, l, max) => {
@@ -1221,6 +1264,7 @@ function viewMetricas() {
     html += `<div class="item"><div class="row"><span class="t" style="font-size:18px">${esc(T.nome)}</span>${chipTema(T.tema)}</div>${T.exercicio ? `<span class="m">${esc(T.exercicio)}</span>` : ""}
       <span class="lbl" style="margin-top:6px">Geral</span>${linha("Todas as modalidades", l, max)}
       <span class="lbl" style="margin-top:8px">Por modalidade</span>${mods.map(m => linha(m, l.filter(x => x.mod === m), max)).join("")}
+      ${compMomentos(tid)}
       <span class="m" style="margin-top:4px">Legenda: ${T.niveis.map((d, i) => `<b>${i + 1}</b> ${esc(String(d))}`).join(" ")}</span></div>`;
   });
   return html + `</div></section>`;
@@ -1231,7 +1275,8 @@ function viewEvolucao() {
   Object.entries(S.avaliacoes).forEach(([id, a]) => {
     const vals = Object.values(a.resultados || {}).filter(Boolean); if (!vals.length || !EQ()[a.equipaId]) return;
     const key = a.equipaId + "|" + (a.teste || a.tema);
-    (linhas[key] = linhas[key] || []).push({ mes: a.mes, media: vals.reduce((x, y) => x + y, 0) / vals.length, n: vals.length, max: maxDe(a), tema: testeDe(a).tema, nome: testeDe(a).nome });
+    const ep = epocaDe(a.data || a.mes + "-01");
+    (linhas[key] = linhas[key] || []).push({ mes: ep + "|" + momentoDe(a), rot: `${momentoDe(a)}.º momento${ep !== epocaDe(hojeISO()) ? " " + ep : ""}`, media: vals.reduce((x, y) => x + y, 0) / vals.length, n: vals.length, max: maxDe(a), tema: testeDe(a).tema, nome: testeDe(a).nome });
   });
   const keys = Object.keys(linhas);
   if (!keys.length) return "";
@@ -1240,7 +1285,7 @@ function viewEvolucao() {
     const [eq] = k.split("|"), l0 = linhas[k][0], tema = l0.tema;
     html += `<div class="item"><div class="row"><span class="t">${esc(equipaNome(eq))}</span>${chipTema(tema)}</div><span class="m">${esc(l0.nome)} · de 1 a ${l0.max}</span>`;
     linhas[k].sort((a, b) => a.mes.localeCompare(b.mes)).forEach(l => {
-      html += `<div class="row"><span class="m" style="width:7.5em">${mesNome(l.mes)}</span><div class="bar" style="flex:1"><i style="width:${l.media / l.max * 100}%;background:${corTema(tema)}"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
+      html += `<div class="row"><span class="m" style="width:8.5em">${esc(l.rot)}</span><div class="bar" style="flex:1"><i style="width:${l.media / l.max * 100}%;background:${corTema(tema)}"></i></div><span class="t" style="font-variant-numeric:tabular-nums">${l.media.toFixed(1)}</span></div>`;
     });
     html += `</div>`;
   });
@@ -1250,7 +1295,7 @@ function guardarAval(alterar) {
   const id = avalId();
   if (!avalPendente || avalPendente.id !== id) {
     const base = S.avaliacoes[id] || {};
-    avalPendente = { id, dados: { equipaId: avalSel.equipaId, teste: avalSel.teste, tema: testes()[avalSel.teste]?.tema, mes: avalSel.mes, datas: { ...(base.datas || {}) }, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
+    avalPendente = { id, dados: { equipaId: avalSel.equipaId, teste: avalSel.teste, tema: testes()[avalSel.teste]?.tema, momento: avalSel.momento, mes: base.mes || avalSel.mes, datas: { ...(base.datas || {}) }, resultados: { ...(base.resultados || {}) }, obs: base.obs || "" } };
   }
   alterar(avalPendente.dados);
   clearTimeout(avalTimer);
@@ -1717,6 +1762,7 @@ $("#view").addEventListener("click", e => {
     return;
   }
   if (e.target.closest("#aTeste button")) { avalSel.teste = e.target.closest("button").dataset.v; return render(); }
+  if (e.target.closest("#aMom button")) { avalSel.momento = +e.target.closest("button").dataset.v; return render(); }
   if (e.target.id === "aAdd1") {
     const nome = $("#aNovo1").value.trim(); if (!nome) return toast("Escreva o nome do atleta");
     guardar("atletas", novoId("a"), { nome, equipaId: avalSel.equipaId }).then(() => { toast(nome + " adicionado"); render(); setTimeout(() => $("#aNovo1")?.focus(), 50); }, () => {});
