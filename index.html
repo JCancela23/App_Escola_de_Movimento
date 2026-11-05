@@ -296,12 +296,13 @@ function chipTema(t) { return [].concat(t || []).filter(x => TEMAS[x]).map(x => 
 // Três maneiras de usar: coordenação (tudo), preparador físico (regista) e consulta (pais, treinadores, direção)
 let vistaComo = null; // a coordenação pode pré-visualizar as outras maneiras
 // Administrador (só o João): também Acessos, Reuniões, Relatórios e Histórico
-const VISTAS = { dono: "Administrador", admin: "Coordenação", write: "Preparador físico", view: "Pais, treinadores e direção" };
+const VISTAS = { dono: "Administrador", admin: "Coordenação", write: "Preparador físico", direcao: "Direção (só leitura)", view: "Pais e treinadores" };
 const nivel = () => role.nivel === "dono" && vistaComo ? vistaComo : role.nivel;
-const podeEscrever = () => nivel() !== "view";
+const podeEscrever = () => nivel() !== "view" && nivel() !== "direcao";
+const eDirecao = () => nivel() === "direcao";
 const podeGerir = () => nivel() === "admin" || nivel() === "dono";
 const eDono = () => nivel() === "dono";
-const TABS = { dono: ["hoje", "sessoes", "exercicios", "avaliacoes", "relatorio", "mais"], admin: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], write: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], view: ["mes", "temas", "exercicios", "avaliacoes"] };
+const TABS = { direcao: ["hoje", "sessoes", "avaliacoes", "relatorio", "mais"], dono: ["hoje", "sessoes", "exercicios", "avaliacoes", "relatorio", "mais"], admin: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], write: ["hoje", "sessoes", "exercicios", "avaliacoes", "mais"], view: ["mes", "temas", "exercicios", "avaliacoes"] };
 function escolherVista() {
   const el = abrirFolha(`<h2>Ver a app como</h2><span class="m">Para confirmar o que cada pessoa vê. Nada muda nos dados.</span>
     <div class="list">${Object.entries(VISTAS).map(([k, t]) => `<button class="item" data-vista="${k}"><div class="row"><span class="t">${t}</span>${nivel() === k ? `<span class="chip ok">atual</span>` : ""}</div></button>`).join("")}</div>
@@ -350,7 +351,7 @@ function renderHeader() {
   h.style.color = tm.length ? corTema(tm[0]) : "";
   $("#heroMes").textContent = (tm.length > 1 ? "temas de " : "tema de ") + mesNome(k);
   $("#heroFoco").textContent = p?.foco || (podeGerir() ? "Defina o tema do mês em Mais › Plano anual." : "");
-  $("#role").textContent = vistaComo ? "A ver como: " + { admin: "Coord.", write: "PF", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
+  $("#role").textContent = vistaComo ? "A ver como: " + { admin: "Coord.", write: "PF", direcao: "Direção", view: "Consulta" }[vistaComo] : sessao || demo ? role.nome : "Entrar";
   const avisoEp = epocaSel ? `<div class="banner">Está a ver a época <b>${epocaSel}</b>. <button class="btn" id="epAtual">Voltar à época atual</button></div>` : "";
   $("#banner").innerHTML = avisoEp + (vistaComo ? `<div class="banner">Está a ver a app como <b>${VISTAS[vistaComo]}</b>. <button class="btn" id="sairVista">Voltar à coordenação</button></div>` : demo ? `<div class="banner">${window.EM_SIM_TEXTO || "Modo demonstração: a app ainda não está ligada à base de dados."}</div>` : !sessao ? `<div class="banner">Está a ver em modo de consulta. Equipa técnica: toque em <b>Entrar</b>.</div>` : "");
 }
@@ -590,7 +591,7 @@ function viewRelatorio() {
   Object.entries(R.porMod).sort().forEach(([k, m]) => html += `<tr><td>${esc(k)}</td><td class="ok">${m.dadas}</td><td class="bad">${m.nao}</td><td>${m.dadas ? Math.round(m.atletas / m.dadas) : "–"}</td></tr>`);
   if (!Object.keys(R.porMod).length) html += `<tr><td colspan="4" class="m">Sem sessões neste período.</td></tr>`;
   html += `</tbody></table></div></section>`;
-  if (podeEscrever() && R.dadas.length) html += `<section><div class="sec-h"><h2>Quem deu as sessões</h2></div><div class="item">${barras(R.porPessoa, "var(--accent)", R.dadas.length)}</div></section>`;
+  if ((podeEscrever() || eDirecao()) && R.dadas.length) html += `<section><div class="sec-h"><h2>Quem deu as sessões</h2></div><div class="item">${barras(R.porPessoa, "var(--accent)", R.dadas.length)}</div></section>`;
   if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div>
     <details class="item"><summary><b>Ver as ${R.nao.length} sessões não realizadas</b></summary>${R.nao.slice().sort((x, y) => x.data.localeCompare(y.data)).map(l => `<div class="row" style="align-items:flex-start"><span>${dataCurta(l.data)} · ${esc(equipaNome(l.equipaId))}</span><span class="m" style="text-align:right">${esc(motivoTxt(l) || "Outro")}</span></div>`).join("")}</details></section>`;
   if (R.porReg.length && podeEscrever()) html += `<section><div class="sec-h"><h2>Por registar</h2></div><div class="list">${R.porReg.map(p => `<div class="item"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}" style="justify-self:start">Registar</button></div>`).join("")}</div></section>`;
@@ -658,7 +659,7 @@ function viewHoje() {
 
   if (eDono()) { const ab = tarefasAbertas(); if (ab.length) html += `<section><div class="sec-h"><h2>Tarefas por fazer</h2><span class="sub">${ab.length}</span></div><div class="list">${ab.slice(0, 5).map(itemTarefa).join("")}</div></section>`; }
 
-  if (!eDono()) return html;
+  if (!eDono() && !eDirecao()) return html;
   html += `<section><div class="sec-h"><h2>Resumo de ${MESES[new Date().getMonth()]}</h2></div>
     <div class="stats">
       <div class="stat"><b class="ok">${dadas.length}</b><span>Realizadas</span></div>
@@ -1341,16 +1342,16 @@ function viewMais() {
   const acessos = sorted(S.acessos, (a, b) => a.id.localeCompare(b.id));
   html += `<section><div class="sec-h"><h2>Acessos</h2></div>
     <div class="item"><span class="t">${sessao ? esc(sessao.user.email) + " · " + role.nome : "Modo de consulta"}</span>
-      <span class="m">${role.nivel === "dono" ? "Pode editar tudo e gerir os acessos, as reuniões, os relatórios e o histórico." : role.nivel === "admin" ? "Pode editar tudo, exceto acessos, reuniões, relatórios e histórico." : role.nivel === "write" ? "Pode registar sessões, notas internas e avaliações, e ajustar horários." : "Pode ver o plano, os exercícios, o horário e o resumo das sessões. Contactos, notas internas e avaliações individuais só aparecem à equipa técnica."}</span>
+      <span class="m">${role.nivel === "dono" ? "Pode editar tudo e gerir os acessos, as reuniões, os relatórios e o histórico." : role.nivel === "admin" ? "Pode editar tudo, exceto acessos, reuniões, relatórios e histórico." : role.nivel === "write" ? "Pode registar sessões, notas internas e avaliações, e ajustar horários." : role.nivel === "direcao" ? "Pode ver as sessões da semana, o registo das sessões, as avaliações e os relatórios. Não pode alterar nada." : "Pode ver o plano, os exercícios, o horário e o resumo das sessões. Contactos, notas internas e avaliações individuais só aparecem à equipa técnica."}</span>
       ${sessao && role.nivel === "view" ? `<span class="m">Se é da equipa técnica, peça ao coordenador para adicionar o seu email.</span>` : ""}
       <div class="actions" style="justify-content:flex-start">${sessao ? `<button class="btn" id="sair">Sair</button>` : `<button class="btn primary" id="entrar">Entrar</button>`}<button class="btn" id="copiarLink">Copiar link para pais e treinadores</button></div></div>`;
   if (eDono()) {
     html += `<div class="item"><span class="t">Equipa técnica com acesso</span>
       <span class="m">Adicione o email da pessoa e o papel. Ela entra em Entrar › Criar conta com esse email. Pais, treinadores e direção não precisam de conta: basta o link.</span>
-      ${acessos.map(a => `<div class="row"><span>${esc(a.nome || a.id)}<br><span class="m">${esc(a.id)} · ${{ administrador: "Administrador", coordenador: "Coordenação" }[a.papel] || "Preparação física"}</span></span>${a.id !== sessao?.user.email?.toLowerCase() ? `<button class="btn danger" data-rmacesso="${esc(a.id)}">Remover</button>` : ""}</div>`).join("")}
+      ${acessos.map(a => `<div class="row"><span>${esc(a.nome || a.id)}<br><span class="m">${esc(a.id)} · ${{ administrador: "Administrador", coordenador: "Coordenação", direcao: "Direção (só leitura)" }[a.papel] || "Preparação física"}</span></span>${a.id !== sessao?.user.email?.toLowerCase() ? `<button class="btn danger" data-rmacesso="${esc(a.id)}">Remover</button>` : ""}</div>`).join("")}
       <div class="field"><label for="acEmail">Email</label><input type="email" id="acEmail" placeholder="nome@exemplo.pt"></div>
       <div class="field"><label for="acNome">Nome</label><input type="text" id="acNome"></div>
-      <div class="field"><label for="acPapel">Papel</label><select id="acPapel"><option value="preparador">Preparação física (regista e ajusta horários)</option><option value="coordenador">Coordenação (tudo, exceto acessos, reuniões, relatórios e histórico)</option></select></div>
+      <div class="field"><label for="acPapel">Papel</label><select id="acPapel"><option value="preparador">Preparação física (regista e ajusta horários)</option><option value="coordenador">Coordenação (tudo, exceto acessos, reuniões, relatórios e histórico)</option><option value="direcao">Direção (vê tudo, incluindo relatórios; não edita nada)</option></select></div>
       <button class="btn primary" id="acAdd">Dar acesso</button></div>`;
     if (Object.values(S.sessoes).some(s => s.exemplo)) html += `<button class="btn danger" id="limparEx">Apagar sessões de exemplo</button>`;
   }
@@ -1920,6 +1921,7 @@ async function definirPapel() {
   if (data?.papel === "administrador") role = { nivel: "dono", nome: "Administrador" };
   else if (data?.papel === "coordenador") role = { nivel: "admin", nome: "Coordenação" };
   else if (data?.papel === "preparador") role = { nivel: "write", nome: "Preparação física" };
+  else if (data?.papel === "direcao") role = { nivel: "direcao", nome: "Direção" };
 }
 async function carregarTudo() {
   await definirPapel();
