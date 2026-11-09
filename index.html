@@ -569,10 +569,62 @@ function barras(obj, cor, total) {
   return Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
     `<div class="row"><span class="m">${esc(k)}</span><span class="t">${n}</span></div><div class="bar"><i style="width:${n / (total || 1) * 100}%;background:${cor}"></i></div>`).join("");
 }
+// Exportação para Excel (só o administrador). A biblioteca só é carregada quando se exporta.
+function carregarXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, erro) => { const sc = document.createElement("script"); sc.src = "vendor/xlsx-0.18.5.mini.min.js"; sc.onload = ok; sc.onerror = () => erro(new Error("Não foi possível carregar o exportador")); document.head.appendChild(sc); });
+}
+async function exportarExcel() {
+  if (!eDono()) return;
+  try { await carregarXLSX(); } catch (e) { return toast(e.message); }
+  const dt = iso => iso ? new Date(iso + "T12:00") : null, nTema = l => l.map(nomeTema).join(", ");
+  const ep = epocaVista(), naEpoca = iso => iso && epocaDe(iso) === ep;
+  const eqs = Object.entries(S.equipas).sort((a, b) => equipaNome(a[0]).localeCompare(equipaNome(b[0])));
+  const sess = Object.entries(S.sessoes).filter(([, x]) => naEpoca(x.data)).sort((a, b) => a[1].data.localeCompare(b[1].data) || (a[1].hora || "").localeCompare(b[1].hora || ""));
+  const folhas = [];
+  const add = (nome, cab, linhas, larg) => folhas.push({ nome, cab, linhas, larg });
+  // Resumo
+  const por = {}; sess.forEach(([, x]) => { const k = equipaNome(x.equipaId), o = por[k] = por[k] || [0, 0, 0]; if (x.estado === "dada") { o[0]++; o[2] += +x.nAtletas || 0; } else o[1]++; });
+  const res = Object.entries(por).sort().map(([k, [a, b, c]]) => [k, a, b, a + b ? Math.round(a / (a + b) * 100) : 0, a ? Math.round(c / a * 10) / 10 : null]);
+  const ta = res.reduce((t, r) => t + r[1], 0), tb = res.reduce((t, r) => t + r[2], 0), tc = sess.filter(([, x]) => x.estado === "dada").reduce((t, [, x]) => t + (+x.nAtletas || 0), 0);
+  res.push(["TOTAL", ta, tb, ta + tb ? Math.round(ta / (ta + tb) * 100) : 0, ta ? Math.round(tc / ta * 10) / 10 : null]);
+  const mot = {}; sess.filter(([, x]) => x.estado !== "dada").forEach(([, x]) => { const m = x.motivo || "Outro"; mot[m] = (mot[m] || 0) + 1; });
+  res.push([], ["Motivos das não realizadas", "Sessões"], ...Object.entries(mot).sort((a, b) => b[1] - a[1]));
+  add("Resumo", ["Modalidade / escalão", "Realizadas", "Não realizadas", "Cumprimento (%)", "Média de atletas"], res, [34, 12, 15, 16, 16]);
+  add("Sessões", ["ID", "Data", "Hora", "Modalidade", "Escalão", "Local", "Duração (min)", "Realizada", "Nº atletas", "Como correu", "Plano", "Avaliação", "Preparador físico", "Motivo (se não realizada)", "Temas", "Exercícios", "Resumo"],
+    sess.map(([id, x]) => { const e = S.equipas[x.equipaId] || {}, ok = x.estado === "dada", pid = ok && planoRegistadoId(x);
+      return [id, dt(x.data), x.hora || "", e.modalidade || "", e.escalao || "", x.local || "", +x.duracao || null, ok ? "Sim" : "Não", ok ? +x.nAtletas || 0 : null, ok ? CORREU.find(c => c.v === x.correu)?.t || "" : "", pid ? S.planos[pid]?.nome || "" : "",
+        (x.avaliacao || []).map(a => `${testes()[a.teste]?.nome || a.teste} · ${momentoDe(a)}.º momento`).join("; "), pessoaNome(x.dadaPor) || "", ok ? "" : motivoTxt(x), nTema(temasDe(x)), (x.exercicios || []).map(i => S.exercicios[i]?.nome).filter(Boolean).join(", "), x.resumo || ""]; }),
+    [16, 11, 7, 16, 18, 22, 9, 10, 9, 11, 14, 22, 16, 40, 16, 60, 30]);
+  add("Avaliações", ["ID", "Modalidade", "Escalão", "Teste", "Momento", "Data", "Atletas avaliados", "Média", "Escala"],
+    Object.entries(S.avaliacoes).filter(([, a]) => naEpoca(a.data || a.mes + "-01")).map(([id, a]) => { const e = S.equipas[a.equipaId] || {}, v = Object.values(a.resultados || {}).filter(Boolean), T = testeDe(a);
+      return [id, e.modalidade || "", e.escalao || "", T.nome + (T.exercicio ? " (" + T.exercicio + ")" : ""), momentoDe(a) + ".º", dt(a.data || a.mes + "-01"), v.length, v.length ? Math.round(v.reduce((t, y) => t + y, 0) / v.length * 100) / 100 : null, "1 a " + maxDe(a)]; })
+      .sort((a, b) => (a[5] - b[5]) || a[1].localeCompare(b[1])), [36, 16, 18, 34, 9, 11, 10, 8, 8]);
+  add("Planos", ["ID", "Nome", "Temas", "Aquecimento", "Parte principal", "Material", "Notas"],
+    Object.entries(S.planos).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, p]) => { const it = k => (p.itens || []).filter(i => parteDe(i) === k).map(i => (i.junto ? "+ " : "") + (S.exercicios[i.exercicioId]?.nome || "?") + (i.dose ? " (" + i.dose + ")" : "") + (i.rondas ? " [bloco " + i.rondas + " rondas]" : "")).join("; ");
+      return [id, p.nome, nTema(temasDe(p)), it("aquecimento"), it("principal"), (p.material || []).map(m => (S.material[m.materialId]?.nome || "") + (m.qtd ? " × " + m.qtd : "")).join("; "), p.notas || ""]; }), [18, 22, 18, 40, 60, 24, 30]);
+  add("Exercícios", ["ID", "Nome", "Tema", "Descrição", "Vídeos"], Object.entries(S.exercicios).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, x]) => [id, x.nome, TEMAS[x.tema] ? nomeTema(x.tema) : "Sem tema", x.descricao || "", videosDe(x).map(v => v.url).join(" ")]), [18, 36, 12, 60, 50]);
+  add("Equipas", ["ID", "Modalidade", "Escalão", "Preparador físico", "Treinadores", "Ativa", "Início", "Horário da Escola do Movimento"],
+    eqs.map(([id, e]) => [id, e.modalidade || "", e.escalao || "", pessoaNome(e.responsavel), (e.treinadores || []).map(pessoaNome).filter(Boolean).join(", "), e.ativa === false ? "Não" : "Sim", dt(e.inicio), horarioDe(e).map(h => `${DIAS[h.dia]} ${h.hora} ${h.local || ""} (${h.duracao || 20}')`).join("; ")]), [16, 16, 18, 16, 28, 7, 11, 60]);
+  add("Pessoas", ["ID", "Nome", "Função", "Modalidade", "Telefone", "Email"], Object.entries(S.pessoas).sort((a, b) => (a[1].nome || "").localeCompare(b[1].nome || "")).map(([id, p]) => [id, p.nome || "", p.funcao || "", p.modalidade || "", p.telefone || "", p.email || ""]), [20, 22, 24, 16, 14, 32]);
+  add("Reuniões", ["ID", "Data", "Hora", "Tipo", "Local", "Objetivos", "Notas", "Tarefas", "Tarefas feitas", "Tarefas por fazer"],
+    Object.entries(S.reunioes).sort((a, b) => (a[1].data || "").localeCompare(b[1].data || "")).map(([id, r]) => { const t = r.tarefas || [];
+      return [id, dt(r.data), r.hora || "", r.tipo === "online" ? "Online" : "Presencial", r.local || "", r.objetivos || "", r.notas || "", t.length, t.filter(x => x.feito).length, t.filter(x => !x.feito).map(x => x.texto + (x.responsavel ? " (" + pessoaNome(x.responsavel) + ")" : "")).join("; ")]; }), [18, 11, 7, 11, 22, 60, 60, 8, 9, 50]);
+  const wb = XLSX.utils.book_new();
+  const leia = [["Escola do Movimento · dados exportados da app"], ["Exportado em", new Date().toLocaleString("pt-PT")], ["Época", ep], [], ["Como atualizar no SharePoint"],
+    ["1.", "Guarde sempre este ficheiro com o mesmo nome, na mesma pasta do SharePoint, e escolha \"Substituir\"."], ["2.", "Cada linha tem um ID que nunca muda: novos registos aparecem e correções ficam atualizadas, sem duplicados."],
+    ["3.", "As versões anteriores ficam no Histórico de versões do SharePoint."], ["4.", "Os nomes dos atletas e as notas individuais não são exportados; só as médias por equipa."]];
+  const wl = XLSX.utils.aoa_to_sheet(leia, { cellDates: true }); wl["!cols"] = [{ wch: 14 }, { wch: 100 }]; XLSX.utils.book_append_sheet(wb, wl, "Leia-me");
+  folhas.forEach(f => { const ws = XLSX.utils.aoa_to_sheet([f.cab, ...f.linhas], { cellDates: true, dateNF: "dd/mm/yyyy" }); ws["!cols"] = f.larg.map(w => ({ wch: w }));
+    if (f.linhas.length && f.nome !== "Resumo") ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: f.linhas.length, c: f.cab.length - 1 } }) };
+    XLSX.utils.book_append_sheet(wb, ws, f.nome); });
+  XLSX.writeFile(wb, "Escola do Movimento - Dados.xlsx", { cellDates: true });
+  toast("Ficheiro exportado: Escola do Movimento - Dados.xlsx");
+}
 function viewRelatorio() {
   const R = calcRelatorio(), fechadas = R.dadas.length + R.nao.length;
   const pct = fechadas ? Math.round(R.dadas.length / fechadas * 100) : 0;
-  let html = `<section><div class="sec-h"><h2>Relatório</h2></div>
+  let html = `${eDono() ? `<section><div class="item"><div class="row"><span class="t">Exportar para o SharePoint</span></div><span class="m">Ficheiro Excel com tudo (sessões, avaliações, planos, exercícios, equipas, pessoas e reuniões). Guarde-o sempre com o mesmo nome na pasta do SharePoint e escolha "Substituir": fica atualizado e o SharePoint guarda as versões anteriores.</span><button class="btn primary" data-act="exportarExcel" style="justify-self:start">Exportar para Excel</button></div></section>` : ""}<section><div class="sec-h"><h2>Relatório</h2></div>
     <div class="seg" id="relP"><button data-v="semana" aria-pressed="${relPeriodo === "semana"}">Semanal</button><button data-v="mes" aria-pressed="${relPeriodo === "mes"}">Mensal</button><button data-v="epoca" aria-pressed="${relPeriodo === "epoca"}">Toda a época</button></div>
     ${relPeriodo === "epoca" ? `<div class="row"><span class="t">${R.P.nome}</span></div>` : `<div class="row"><button class="btn" data-rel="-1" aria-label="Período anterior">‹</button><span class="t">${R.P.nome}</span><button class="btn" data-rel="1" aria-label="Período seguinte" ${relOffset >= 0 ? "disabled" : ""}>›</button></div>`}
     <div class="stats">
@@ -1836,6 +1888,7 @@ $("#view").addEventListener("click", e => {
   const id = a.dataset.id;
   ({
     atraso: () => abrirAtraso(),
+    exportarExcel: () => exportarExcel(),
     planoSessao: () => verPlanoSessao(id, a.dataset.data), verPlano: () => verPlano(id), novoPlano: () => formPlano(),
     novoMaterial: () => formMaterial(), editMaterial: () => formMaterial(id),
     verEquipa: () => verEquipa(id), atleta: () => formAtleta(id), moverAtletas: () => formMoverAtletas(),
