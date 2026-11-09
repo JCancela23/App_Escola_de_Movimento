@@ -914,14 +914,27 @@ function viewExercicios() {
   if (subExe === "material") return topo + viewMaterial();
   return topo + viewListaExercicios();
 }
+// procura de exercícios: sem acentos nem maiúsculas, em todos os temas
+let procuraEx = "";
+const normal = t => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function exerciciosParecidos(q, semId) { const n = normal(q); if (n.length < 2) return []; const pal = n.split(/\s+/);
+  return sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome)).filter(e => e.id !== semId && pal.every(w => normal(e.nome + " " + (e.descricao || "")).includes(w))); }
+function aplicarProcuraEx() {
+  const res = $("#xProcuraRes"), lista = $("#xLista"); if (!res || !lista) return;
+  if (normal(procuraEx).length < 2) { res.innerHTML = ""; lista.hidden = false; return; }
+  const l = exerciciosParecidos(procuraEx); lista.hidden = true;
+  res.innerHTML = `<span class="m">${l.length ? `${l.length} encontrado${l.length > 1 ? "s" : ""} em todos os temas` : "Ainda não existe nenhum exercício com este nome."}</span><div class="list">${l.map(itemExercicio).join("")}</div>${!l.length && podeGerir() ? `<button class="btn primary" data-act="novoExercicio" data-nome="${esc(procuraEx.trim())}">Adicionar "${esc(procuraEx.trim())}"</button>` : ""}`;
+}
 function viewListaExercicios() {
   let lista = sorted(S.exercicios, (a, b) => a.nome.localeCompare(b.nome));
   if (filtroTema === "sem") lista = lista.filter(e => !TEMAS[e.tema]);
   else if (filtroTema !== "todos") lista = lista.filter(e => e.tema === filtroTema);
   let html = `<section><div class="sec-h"><h2>Exercícios</h2><span class="sub">${lista.length}</span></div>`;
   html += `<div class="filters" role="group" aria-label="Filtrar por tema"><button data-ftema="todos" aria-pressed="${filtroTema === "todos"}">Todos</button>${Object.keys(TEMAS).map(t => `<button data-ftema="${t}" aria-pressed="${filtroTema === t}">${esc(TEMAS[t].nome)}</button>`).join("")}<button data-ftema="sem" aria-pressed="${filtroTema === "sem"}">Sem tema</button></div>`;
+  html += `<input type="search" id="xProcura" placeholder="Procurar exercício (nome ou descrição)" aria-label="Procurar exercício" value="${esc(procuraEx)}" autocomplete="off">
+    <div id="xProcuraRes"></div>`;
   if (podeGerir()) html += `<button class="btn" data-act="novoExercicio">Adicionar exercício</button>`;
-  html += `<div class="list">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">${filtroTema === "sem" ? "Não há exercícios sem tema." : "Sem exercícios neste tema."}</div>`}</div></section>`;
+  html += `<div class="list" id="xLista">${lista.length ? lista.map(itemExercicio).join("") : `<div class="empty">${filtroTema === "sem" ? "Não há exercícios sem tema." : "Sem exercícios neste tema."}</div>`}</div></section>`;
   return html;
 }
 function verExercicio(id) {
@@ -941,12 +954,14 @@ const linhaVideo = v => `<div class="item" style="padding:8px 10px" data-vid><di
 function formExercicio(e) {
   e = e || { tema: TEMAS[filtroTema] ? filtroTema : "" };
   const el = abrirFolha(`<h2>${e.id ? "Editar exercício" : "Novo exercício"}</h2>
-    <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"></div>
+    <div class="field"><label for="xNome">Nome</label><input type="text" id="xNome" value="${esc(e.nome)}"><span class="m warn" id="xJaExiste"></span></div>
     <div class="field"><label for="xTema">Tema (opcional)</label><select id="xTema"><option value="">Sem tema</option>${Object.keys(TEMAS).map(t => `<option value="${t}" ${t === e.tema ? "selected" : ""}>${esc(TEMAS[t].nome)}</option>`).join("")}</select></div>
     <div class="field"><span class="lbl">Vídeos (YouTube, Instagram, Drive…)</span><span class="m">Pode pôr mais do que um, por exemplo um para cada maneira de fazer.</span><div class="list" id="xVids">${(videosDe(e).length ? videosDe(e) : [{ nome: "", url: "" }]).map(linhaVideo).join("")}</div><button class="btn" id="xAddVid">+ Outro vídeo</button></div>
     <div class="field"><label for="xDesc">Como fazer</label><textarea id="xDesc">${esc(e.descricao)}</textarea></div>
     <div class="field"><label for="xProg">Progressão</label><textarea id="xProg">${esc(e.progressao)}</textarea></div>
     <div class="actions">${e.id ? `<button class="btn danger" id="xDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="xOk">Guardar</button></div>`);
+  const avisoNome = () => { const l = exerciciosParecidos($("#xNome", el).value, e.id); $("#xJaExiste", el).textContent = l.length ? "Já existe" + (l.length > 1 ? "m" : "") + ": " + l.slice(0, 4).map(x => x.nome).join(", ") + (l.length > 4 ? "…" : "") : ""; };
+  $("#xNome", el).addEventListener("input", avisoNome); avisoNome();
   $("#xOk", el).addEventListener("click", async () => {
     const nome = $("#xNome", el).value.trim(); if (!nome) return toast("Escreva o nome do exercício");
     const videos = [...el.querySelectorAll("[data-vid]")].map(r => ({ nome: r.querySelector(".vNome").value.trim(), url: r.querySelector(".vUrl").value.trim() })).filter(v => /^https?:\/\//.test(v.url));
@@ -1772,7 +1787,7 @@ function editEquipa(id) {
 // ---------- folha ----------
 // as caixas de texto crescem para baixo à medida que se escreve, para se ver tudo
 function crescer(t) { if (!t.isConnected) return; t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
-document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") crescer(e.target); });
+document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") crescer(e.target); if (e.target.id === "xProcura") { procuraEx = e.target.value; aplicarProcuraEx(); } });
 function abrirFolha(html) {
   fecharFolha();
   const bg = document.createElement("div"); bg.className = "sheet-bg"; bg.id = "sheet";
@@ -1796,6 +1811,7 @@ function render() {
   renderHeader();
   const v = { mes: viewMes, temas: viewTemas, relatorio: viewRelatorio, hoje: viewHoje, sessoes: viewSessoes, exercicios: viewExercicios, avaliacoes: viewAvaliacoes, mais: viewMais }[tab];
   $("#view").innerHTML = v();
+  aplicarProcuraEx();
   requestAnimationFrame(() => document.querySelectorAll("#view textarea").forEach(crescer));
   document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
 }
@@ -1896,7 +1912,7 @@ $("#view").addEventListener("click", e => {
     registarPrev: () => { const pv = previstas(a.dataset.data, a.dataset.data).find(x => x.equipaId === id) || {}; formSessao({ equipaId: id, data: a.dataset.data, hora: pv.hora, local: pv.local, duracao: pv.duracao }); },
     alterar: () => formAlteracao(id, a.dataset.data),
     registar: () => formSessao(id && S.equipas[id] ? { equipaId: id } : null),
-    verSessao: () => verSessao(id), verExercicio: () => verExercicio(id), novoExercicio: () => formExercicio(), teste: () => formTeste(id),
+    verSessao: () => verSessao(id), verExercicio: () => verExercicio(id), novoExercicio: () => formExercicio(a.dataset.nome ? { nome: a.dataset.nome, tema: TEMAS[filtroTema] ? filtroTema : "" } : null), teste: () => formTeste(id),
     editPlano: () => editPlano(id), editEquipa: () => editEquipa(id), verPessoa: () => verPessoa(id), editPessoa: () => editPessoa(id)
   })[a.dataset.act]?.();
 });
