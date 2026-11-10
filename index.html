@@ -262,7 +262,7 @@ let epocaSel = null; // época que se está a ver (null = a atual)
 const epocaVista = () => epocaSel || epocaDe(hojeISO());
 function EQ(ep = epocaVista()) { return Object.fromEntries(Object.entries(S.equipas).filter(([, e]) => epocaEquipa(e) === ep)); }
 function epocasConhecidas() { return [...new Set([epocaDe(hojeISO()), ...Object.values(S.equipas).map(epocaEquipa)])].sort(); }
-const S = { equipas: {}, exercicios: {}, plano: {}, sessoes: {}, notas: {}, atletas: {}, avaliacoes: {}, pessoas: {}, alteracoes: {}, reunioes: {}, planos: {}, material: {}, planeadas: {}, semanas: {} };
+const S = { equipas: {}, exercicios: {}, plano: {}, sessoes: {}, notas: {}, atletas: {}, avaliacoes: {}, pessoas: {}, alteracoes: {}, reunioes: {}, planos: {}, material: {}, planeadas: {}, semanas: {}, tarefas: {} };
 let subExe = "exercicios";
 let relPeriodo = "semana", relOffset = 0;
 let db = null, demo = false;
@@ -744,10 +744,10 @@ async function construirExcel() {
   const reun = Object.entries(S.reunioes).sort((a, b) => (a[1].data || "").localeCompare(b[1].data || ""));
   const WR = wb.addWorksheet("Reuniões", { views: [{ state: "frozen", ySplit: 1 }] });
   larguras(WR, [11, 7, 11, 22, 24, 60, 60, 9, 18]); datas(WR, [1]);
-  tabela(WR, 1, 1, ["Data", "Hora", "Tipo", "Local", "Participantes", "Objetivos", "Notas", "Tarefas feitas", "ID"],
-    reun.map(([id, x]) => { const t = x.tarefas || []; return [dt(x.data), x.hora || "", x.tipo === "online" ? "Online" : "Presencial", x.local || "", (x.participantes || []).map(pessoaNome).filter(Boolean).join(", "), x.objetivos || "", x.notas || "", `${t.filter(y => y.feito).length} de ${t.length}`, id]; }), { vazio: "Ainda não há reuniões." });
+  tabela(WR, 1, 1, ["Data", "Hora", "Tipo", "Local", "Participantes", "Objetivos e o que foi falado", "Outras notas", "Tarefas feitas", "ID"],
+    reun.map(([id, x]) => { const t = x.tarefas || []; return [dt(x.data), x.hora || "", x.tipo === "online" ? "Online" : "Presencial", x.local || "", (x.participantes || []).map(pessoaNome).filter(Boolean).join(", "), x.pontos ? x.pontos.map((o, i) => `${i + 1}. ${o.texto}${o.estado ? " [" + (o.estado === "tratado" ? "Tratado" : "Adiado") + "]" : ""}${o.falado ? "\n   → " + o.falado : ""}`).join("\n") : x.objetivos || "", x.notas || "", `${t.filter(tarefaFeita).length} de ${t.length}`, id]; }), { vazio: "Ainda não há reuniões." });
   const WTa = wb.addWorksheet("Tarefas", { views: [{ state: "frozen", ySplit: 1 }] });
-  const lta = reun.flatMap(([id, x]) => (x.tarefas || []).map(t => [dt(x.data), t.texto || "", pessoaNome(t.responsavel) || "", dt(t.prazo), t.feito ? "Feita" : "Por fazer"]));
+  const lta = reun.flatMap(([id, x]) => (x.tarefas || []).map(t => [dt(x.data), t.texto || "", respDe(t).map(pessoaNome).filter(Boolean).join(", "), dt(t.prazo), tarefaFeita(t) ? "Feita" : "Por fazer"]));
   larguras(WTa, [13, 60, 18, 11, 11]); datas(WTa, [1, 4]);
   tabela(WTa, 1, 1, ["Reunião de", "Tarefa", "Responsável", "Prazo", "Estado"], lta, { vazio: "Sem tarefas." });
   marca(WTa, 5, lta.length, { "Por fazer": ["FFFFF1B8", AMAR], "Feita": [VERDE_CL, VERDE] });
@@ -835,7 +835,7 @@ function viewHoje() {
   prev.sort((x, y) => x.data.localeCompare(y.data) || (x.hora || "").localeCompare(y.hora || ""));
   const est = prev.map(p => { const x = sessaoDe(p); return x ? x.estado : p.cancelada ? "nao_dada" : p.data <= hoje ? "porReg" : "prevista"; });
   const n = k => est.filter(e => e === k).length;
-  let html = `<section><div class="sec-h"><h2>${hojeOffset === 0 ? "Esta semana" : hojeOffset === -1 ? "Semana passada" : hojeOffset === 1 ? "Próxima semana" : "Semana"}</h2><span class="sub">${dataCurta(seg).slice(4)} a ${dataCurta(dom).slice(4)}</span></div>
+  let html = viewMinhasTarefas() + `<section><div class="sec-h"><h2>${hojeOffset === 0 ? "Esta semana" : hojeOffset === -1 ? "Semana passada" : hojeOffset === 1 ? "Próxima semana" : "Semana"}</h2><span class="sub">${dataCurta(seg).slice(4)} a ${dataCurta(dom).slice(4)}</span></div>
     <div class="row"><button class="btn" data-hsem="-1" aria-label="Semana anterior">‹ Anterior</button>${hojeOffset ? `<button class="btn ghost" data-hsem="0">Esta semana</button>` : ""}<button class="btn" data-hsem="1" aria-label="Semana seguinte">Seguinte ›</button></div>
     <div class="stats"><div class="stat"><b class="ok">${n("dada")}</b><span>Realizadas</span></div><div class="stat"><b class="bad">${n("nao_dada")}</b><span>Não realizadas</span></div><div class="stat"><b class="warn">${n("porReg")}</b><span>Por registar</span></div><div class="stat"><b>${n("prevista")}</b><span>Por dar</span></div></div>
     <div class="list">`;
@@ -1741,14 +1741,56 @@ function viewSemana() {
   if (!todas.length) html += `<div class="empty">Sem sessões nesta semana.</div>`;
   return html + `<span class="m">${dias.length > 2 ? "No telemóvel, deslize para o lado para ver os outros dias. " : ""}Toque numa sessão para mudar a hora, o local ou o dia só nessa semana. O horário fixo muda-se em Mais › Pessoas e escalões.</span></section>`;
 }
+// Tarefas: guardadas na reunião (só o administrador vê). Cópia em "tarefas" para cada responsável ver as suas (pelo email da pessoa).
+const respDe = t => t.responsaveis || (t.responsavel ? [t.responsavel] : []);
+// estado mais recente ganha: o administrador na reunião (t.mudouEm) ou o responsável na sua lista (S.tarefas[id].mudouEm)
+const tarefaFeita = t => { const m = t.id && S.tarefas[t.id]; return !!(m && (m.mudouEm || 0) > (t.mudouEm || 0) ? m.feito : t.feito); };
+async function sincronizarTarefas(rid, r) {
+  if (!eDono() || (!demo && !temTarefas)) return;
+  const ids = new Set();
+  for (const t of r.tarefas || []) {
+    if (!t.id || !t.texto) continue;
+    const emails = respDe(t).map(p => (S.pessoas[p]?.email || "").trim().toLowerCase()).filter(Boolean);
+    if (!emails.length || emails.every(e => e === meuEmail)) continue;
+    if (!S.tarefas[t.id] && tarefaFeita(t)) continue; // tarefas já feitas antes não geram aviso
+    ids.add(t.id);
+    const ant = S.tarefas[t.id] || {}, feito = tarefaFeita(t), mudouEm = Math.max(t.mudouEm || 0, ant.mudouEm || 0) || null;
+    const novo = { texto: t.texto, responsaveis: respDe(t), emails, prazo: t.prazo || null, feito, feitoEm: feito ? ant.feitoEm || Date.now() : null, feitoPor: feito ? ant.feitoPor || meuEmail : null, mudouEm, reuniaoId: rid, reuniaoData: r.data, objetivo: (r.pontos || []).find(p => p.id === t.objetivo)?.texto || "", criadaEm: ant.criadaEm || Date.now() };
+    const cmp = o => JSON.stringify(Object.keys(novo).map(k => o[k] ?? null));
+    if (cmp(novo) !== cmp(ant)) await guardar("tarefas", t.id, { ...ant, ...novo }).catch(() => {});
+  }
+  for (const [id, x] of Object.entries(S.tarefas)) if (x.reuniaoId === rid && !ids.has(id)) await apagar("tarefas", id);
+}
+const minhasPessoas = () => Object.entries(S.pessoas).filter(([, p]) => meuEmail && (p.email || "").trim().toLowerCase() === meuEmail).map(([id]) => id);
+const minhasTarefas = () => Object.entries(S.tarefas).filter(([, t]) => (t.emails || []).includes(meuEmail)).map(([id, t]) => ({ id, ...t })).sort((a, b) => !!a.feito - !!b.feito || (a.prazo || "9999").localeCompare(b.prazo || "9999"));
+function itemMinha(t) {
+  const atrasada = !t.feito && t.prazo && t.prazo < hojeISO(), outros = (t.responsaveis || []).map(pessoaNome).filter(Boolean);
+  return `<label class="item" style="grid-template-columns:auto 1fr;align-items:start;gap:10px;cursor:pointer"><input type="checkbox" data-minha="${t.id}" ${t.feito ? "checked" : ""} style="width:22px;height:22px;margin-top:2px">
+    <span><span class="t" style="${t.feito ? "text-decoration:line-through;opacity:.6" : ""}">${esc(t.texto)}</span><br><span class="m">${t.prazo ? `<span class="${atrasada ? "bad" : ""}">até ${dataCurta(t.prazo)}</span>` : "sem prazo"} · reunião de ${dataCurta(t.reuniaoData)}${outros.length > 1 ? " · com " + esc(outros.join(", ")) : ""}${t.objetivo ? `<br>Objetivo: ${esc(t.objetivo)}` : ""}</span></span></label>`;
+}
+function viewMinhasTarefas() {
+  if (eDono()) return "";
+  const l = minhasTarefas(); if (!l.length) return "";
+  const ab = l.filter(t => !t.feito);
+  return `<section><div class="sec-h"><h2>As minhas tarefas</h2><span class="sub">${ab.length ? ab.length + " por fazer" : "todas feitas"}</span></div><div class="list">${l.filter(t => !t.feito || t.feitoEm > Date.now() - 7 * 864e5).map(itemMinha).join("")}</div></section>`;
+}
+// aviso ao abrir a app, quando há tarefas novas atribuídas a quem entrou
+function avisarTarefas() {
+  if (eDono() || !meuEmail) return;
+  let vistas = []; try { vistas = JSON.parse(localStorage.getItem("em_tarefas_vistas_" + meuEmail) || "[]"); } catch (e) {}
+  const novas = minhasTarefas().filter(t => !t.feito && !vistas.includes(t.id)); if (!novas.length) return;
+  const el = abrirFolha(`<h2>📌 ${novas.length === 1 ? "Tens 1 tarefa nova" : "Tens " + novas.length + " tarefas novas"}</h2><span class="m">Atribuídas nas reuniões. Ficam também no Hoje, em "As minhas tarefas".</span><div class="list">${novas.map(itemMinha).join("")}</div><div class="actions"><button class="btn primary" data-close>OK, vi</button></div>`);
+  el.addEventListener("change", ev => { const c = ev.target.closest("[data-minha]"); if (c) { const id = c.dataset.minha, t = { ...S.tarefas[id], feito: c.checked, mudouEm: Date.now(), feitoEm: c.checked ? Date.now() : null, feitoPor: c.checked ? meuEmail : null }; guardar("tarefas", id, t).then(() => toast(c.checked ? "Tarefa concluída. O João vai ver." : "Tarefa reaberta"), () => {}); } });
+  try { localStorage.setItem("em_tarefas_vistas_" + meuEmail, JSON.stringify([...new Set(vistas.concat(minhasTarefas().map(t => t.id)))])); } catch (e) {}
+}
 function tarefasAbertas() {
-  return Object.entries(S.reunioes).flatMap(([rid, r]) => (r.tarefas || []).map((t, i) => ({ ...t, rid, i, reuniao: r.data }))).filter(t => !t.feito && t.texto)
+  return Object.entries(S.reunioes).flatMap(([rid, r]) => (r.tarefas || []).map((t, i) => ({ ...t, rid, i, reuniao: r.data }))).filter(t => !tarefaFeita(t) && t.texto)
     .sort((a, b) => (a.prazo || "9999").localeCompare(b.prazo || "9999"));
 }
 function itemTarefa(t) {
   const atrasada = t.prazo && t.prazo < hojeISO();
   return `<label class="item" style="grid-template-columns:auto 1fr;align-items:start;gap:10px;cursor:pointer"><input type="checkbox" data-tarefa="${t.rid}|${t.i}" ${t.feito ? "checked" : ""} style="width:22px;height:22px;margin-top:2px">
-    <span><span class="t">${esc(t.texto)}</span><br><span class="m">${pessoaNome(t.responsavel) ? esc(pessoaNome(t.responsavel)) + " · " : ""}${t.prazo ? `<span class="${atrasada ? "bad" : ""}">até ${dataCurta(t.prazo)}</span>` : "sem prazo"}</span></span></label>`;
+    <span><span class="t">${esc(t.texto)}</span><br><span class="m">${respDe(t).map(pessoaNome).filter(Boolean).length ? esc(respDe(t).map(pessoaNome).filter(Boolean).join(", ")) + " · " : ""}${t.prazo ? `<span class="${atrasada ? "bad" : ""}">até ${dataCurta(t.prazo)}</span>` : "sem prazo"}</span></span></label>`;
 }
 function viewEpocas() {
   if (!podeEscrever()) return "";
@@ -1767,7 +1809,7 @@ function viewReunioes() {
   if (abertas.length) html += `<span class="lbl">Tarefas por fazer (${abertas.length})</span><div class="list">${abertas.slice(0, 8).map(itemTarefa).join("")}</div>`;
   html += `<div class="list">`;
   lista.slice(0, 12).forEach(r => {
-    const ab = (r.tarefas || []).filter(t => !t.feito && t.texto).length;
+    const ab = (r.tarefas || []).filter(t => !tarefaFeita(t) && t.texto).length;
     html += `<button class="item" data-act="reuniao" data-id="${r.id}">
       <div class="row"><span class="t">${dataCurta(r.data)}${r.hora ? " · " + esc(r.hora) : ""}</span><span class="chip" style="color:var(--muted)">${r.tipo === "online" ? "Online" : "Presencial"}</span></div>
       <span class="m">${esc(r.local || "")}${(r.participantes || []).length ? " · " + r.participantes.map(pessoaNome).filter(Boolean).map(esc).join(", ") : ""}</span>
@@ -1782,33 +1824,60 @@ function formReuniao(id) {
   const r = S.reunioes[id] ? JSON.parse(JSON.stringify(S.reunioes[id])) : { data: hojeISO(), hora: "", tipo: "presencial", local: "", participantes: [], objetivos: "", notas: "", tarefas: [] };
   let tipo = r.tipo; const part = (r.participantes || []).slice();
   const pessoas = sorted(S.pessoas, (a, b) => a.nome.localeCompare(b.nome));
-  const linhaT = (t, i) => `<div class="item" style="padding:8px 10px" data-t="${i}">
-      <div class="row"><input type="checkbox" class="tFeito" ${t.feito ? "checked" : ""} aria-label="Feita" style="width:22px;height:22px;flex:none"><textarea rows="1" class="tTexto" placeholder="O que há a fazer">${esc(t.texto)}</textarea></div>
-      <div class="row"><select class="tResp" aria-label="Responsável" style="flex:1"><option value="">Responsável</option>${pessoas.map(p => `<option value="${p.id}" ${p.id === t.responsavel ? "selected" : ""}>${esc(p.nome)}</option>`).join("")}</select><input type="date" class="tPrazo" value="${t.prazo || ""}" aria-label="Prazo" style="flex:1"></div></div>`;
+  // objetivos: lista com o que foi falado em cada um (as reuniões antigas tinham um texto, uma linha por objetivo)
+  const pontos = r.pontos || (r.objetivos || "").split("\n").map(x => x.replace(/^\s*[-•*\d.)]+\s*/, "").trim()).filter(Boolean).map(texto => ({ id: novoId("o"), texto, falado: "", estado: "" }));
+  const ESTADOS = [["", "Por tratar"], ["tratado", "Tratado"], ["adiado", "Adiado"]];
+  const linhaO = o => `<div class="item" style="padding:8px 10px" data-o="${o.id}">
+      <div class="row"><textarea rows="1" class="oTexto" placeholder="Objetivo" aria-label="Objetivo" style="font-weight:600">${esc(o.texto)}</textarea><button class="btn ghost" data-rmo aria-label="Tirar objetivo">✕</button></div>
+      <textarea rows="1" class="oFalado" placeholder="O que foi falado / decidido" aria-label="O que foi falado / decidido">${esc(o.falado)}</textarea>
+      <div class="seg oEstado">${ESTADOS.map(([v, n]) => `<button data-v="${v}" aria-pressed="${(o.estado || "") === v}">${n}</button>`).join("")}</div></div>`;
+  const tOrig = {}; (r.tarefas || []).forEach(t => { if (!t.id) t.id = novoId("t"); tOrig[t.id] = t; });
+  const optObj = sel => `<option value="">Sem objetivo associado</option>` + [...el0().querySelectorAll("[data-o]")].map((x, i) => `<option value="${x.dataset.o}" ${x.dataset.o === sel ? "selected" : ""}>${i + 1}. ${esc((x.querySelector(".oTexto").value || "Objetivo sem texto").slice(0, 60))}</option>`).join("");
+  let elRef = null; const el0 = () => elRef || document.createElement("div");
+  const chipsResp = ids => ids.map(p => `<button class="chip" data-resp="${p}" style="color:var(--accent)" aria-label="Tirar ${esc(pessoaNome(p))}">${esc(pessoaNome(p))}${S.pessoas[p]?.email ? "" : " (sem email)"} ✕</button>`).join("");
+  const linhaT = t => { if (!t.id) t.id = novoId("t"); const rs = respDe(t); return `<div class="item" style="padding:8px 10px" data-t="${t.id}" data-resps="${rs.join(",")}" data-obj="${t.objetivo || ""}">
+      <div class="row"><input type="checkbox" class="tFeito" ${tarefaFeita(t) ? "checked" : ""} data-orig="${tarefaFeita(t) ? 1 : 0}" aria-label="Feita" style="width:22px;height:22px;flex:none"><textarea rows="1" class="tTexto" placeholder="O que há a fazer">${esc(t.texto)}</textarea></div>
+      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:6px"><span class="tChips" style="display:contents">${chipsResp(rs)}</span><select class="tAddResp" aria-label="Adicionar responsável" style="flex:1;min-width:150px"><option value="">+ Responsável</option>${pessoas.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join("")}</select></div>
+      ${t.id && S.tarefas[t.id]?.feito && S.tarefas[t.id].feitoPor && S.tarefas[t.id].feitoPor !== meuEmail ? `<span class="m" style="color:var(--accent)">✓ Feita por ${esc(Object.values(S.pessoas).find(p => (p.email || "").trim().toLowerCase() === S.tarefas[t.id].feitoPor)?.nome || S.tarefas[t.id].feitoPor)} a ${new Date(S.tarefas[t.id].feitoEm).toLocaleDateString("pt-PT")}</span>` : ""}
+      <div class="row"><select class="tObj" aria-label="Objetivo associado" style="flex:1"></select><input type="date" class="tPrazo" value="${t.prazo || ""}" aria-label="Prazo" style="flex:1"></div></div>`; };
   const el = abrirFolha(`<h2>${novo ? "Registar reunião" : "Reunião"}</h2><span class="m" id="rEstado">Vai sendo guardada automaticamente enquanto escreve.</span>
     <div class="row"><div class="field" style="flex:1"><label for="rData">Data</label><input type="date" id="rData" value="${r.data}"></div>
       <div class="field" style="flex:1"><label for="rHora">Hora</label><input type="time" step="300" id="rHora" value="${horaStd(r.hora)}"></div></div>
     <div class="field"><span class="lbl">Tipo</span><div class="seg" id="rTipo"><button data-v="presencial">Presencial</button><button data-v="online">Online</button></div></div>
     <div class="field"><label for="rLocal" id="rLocalLbl">Local</label><input type="text" id="rLocal" value="${esc(r.local)}"></div>
     <div class="field"><span class="lbl">Participantes</span><div class="seg" id="rPart">${pessoas.map(p => `<button data-v="${p.id}" aria-pressed="${part.includes(p.id)}">${esc(p.nome)}</button>`).join("") || `<span class="m">Adicione pessoas em Mais › Pessoas.</span>`}</div></div>
-    <div class="field"><label for="rObj">Objetivos</label><textarea id="rObj" placeholder="O que se quer decidir ou preparar">${esc(r.objetivos)}</textarea></div>
-    <div class="field"><label for="rNotas">Notas da reunião (o que foi falado e decidido)</label><textarea id="rNotas" style="min-height:160px">${esc(r.notas)}</textarea></div>
-    <div class="field"><span class="lbl">Tarefas para depois da reunião</span><div class="list" id="rTarefas">${(r.tarefas || []).map(linhaT).join("")}</div><button class="btn" id="rAddT">Adicionar tarefa</button></div>
+    <div class="field"><span class="lbl">Objetivos e o que foi falado</span><span class="m">Antes da reunião escreva os objetivos. Na reunião, por baixo de cada um, o que foi falado ou decidido.</span><div class="list" id="rObjs">${pontos.map(linhaO).join("")}</div><button class="btn" id="rAddO">Adicionar objetivo</button></div>
+    <div class="field"><label for="rNotas">Outras notas da reunião</label><textarea id="rNotas" style="min-height:160px">${esc(r.notas)}</textarea></div>
+    <div class="field"><span class="lbl">Tarefas para depois da reunião</span><span class="m">Cada responsável com email na app vê as suas tarefas e recebe um aviso ao abrir a app.</span><div class="list" id="rTarefas">${(r.tarefas || []).map(linhaT).join("")}</div><button class="btn" id="rAddT">Adicionar tarefa</button></div>
     <div class="actions">${!novo ? `<button class="btn danger" id="rDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="rOk">Guardar</button></div>`);
   const sync = () => { $("#rTipo", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === tipo))); $("#rLocalLbl", el).textContent = tipo === "online" ? "Plataforma ou link (Teams, Zoom…)" : "Local"; };
   $("#rTipo", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (b) { tipo = b.dataset.v; sync(); } });
   $("#rPart", el).addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; const i = part.indexOf(b.dataset.v); i >= 0 ? part.splice(i, 1) : part.push(b.dataset.v); b.setAttribute("aria-pressed", String(i < 0)); });
-  $("#rAddT", el).addEventListener("click", () => { const box = $("#rTarefas", el); box.insertAdjacentHTML("beforeend", linhaT({}, box.children.length)); box.lastElementChild.querySelector(".tTexto").focus(); });
-  sync();
-  const recolher = () => ({ data: $("#rData", el).value || hojeISO(), hora: $("#rHora", el).value.trim(), tipo, local: $("#rLocal", el).value.trim(), participantes: part.slice(), objetivos: $("#rObj", el).value.trim(), notas: $("#rNotas", el).value.trim(),
-    tarefas: [...el.querySelectorAll("[data-t]")].map(x => ({ texto: x.querySelector(".tTexto").value.trim(), responsavel: x.querySelector(".tResp").value || null, prazo: x.querySelector(".tPrazo").value || null, feito: x.querySelector(".tFeito").checked })).filter(t => t.texto), criadoEm: r.criadoEm || Date.now() });
+  elRef = el;
+  const encherObj = () => el.querySelectorAll("[data-t]").forEach(x => { const s0 = x.querySelector(".tObj"); const v = s0.value || x.dataset.obj; s0.innerHTML = optObj(v); });
+  $("#rAddT", el).addEventListener("click", () => { const box = $("#rTarefas", el); box.insertAdjacentHTML("beforeend", linhaT({})); encherObj(); box.lastElementChild.querySelector(".tTexto").focus(); });
+  $("#rAddO", el).addEventListener("click", () => { const box = $("#rObjs", el); box.insertAdjacentHTML("beforeend", linhaO({ id: novoId("o"), texto: "", falado: "", estado: "" })); encherObj(); box.lastElementChild.querySelector(".oTexto").focus(); });
+  el.addEventListener("click", ev => {
+    const e1 = ev.target.closest(".oEstado button"); if (e1) { e1.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === e1))); agendar(); }
+    const ro = ev.target.closest("[data-rmo]"); if (ro) { ro.closest("[data-o]").remove(); encherObj(); agendar(); }
+    const rr = ev.target.closest("[data-resp]"); if (rr) { const row = rr.closest("[data-t]"); row.dataset.resps = row.dataset.resps.split(",").filter(x => x && x !== rr.dataset.resp).join(","); rr.remove(); agendar(); }
+  });
+  el.addEventListener("change", ev => { const a = ev.target.closest(".tAddResp"); if (a && a.value) { const row = a.closest("[data-t]"), l = row.dataset.resps.split(",").filter(Boolean); if (!l.includes(a.value)) { l.push(a.value); row.dataset.resps = l.join(","); row.querySelector(".tChips").innerHTML = chipsResp(l); } a.value = ""; } });
+  el.addEventListener("input", ev => { if (ev.target.matches(".oTexto")) encherObj(); });
+  encherObj(); sync();
+  const recolher = () => ({ data: $("#rData", el).value || hojeISO(), hora: $("#rHora", el).value.trim(), tipo, local: $("#rLocal", el).value.trim(), participantes: part.slice(), ...lerPontos(), notas: $("#rNotas", el).value.trim(),
+    tarefas: [...el.querySelectorAll("[data-t]")].map(x => { const id = x.dataset.t, o = tOrig[id] || {}, c = x.querySelector(".tFeito"), mudou = c.checked !== (c.dataset.orig === "1");
+      return { id, texto: x.querySelector(".tTexto").value.trim(), responsaveis: x.dataset.resps.split(",").filter(Boolean), objetivo: x.querySelector(".tObj").value || null, prazo: x.querySelector(".tPrazo").value || null,
+        feito: mudou ? c.checked : !!o.feito, mudouEm: mudou ? (x._mudouEm = x._mudouEm || Date.now()) : o.mudouEm || null }; }).filter(t => t.texto), criadoEm: r.criadoEm || Date.now() });
+  const lerPontos = () => { const p = [...el.querySelectorAll("[data-o]")].map(x => ({ id: x.dataset.o, texto: x.querySelector(".oTexto").value.trim(), falado: x.querySelector(".oFalado").value.trim(), estado: x.querySelector(".oEstado [aria-pressed=true]")?.dataset.v || "" })).filter(o => o.texto || o.falado);
+    return { pontos: p, objetivos: p.map(o => o.texto).join("\n") }; };
   // guarda sozinha enquanto se escreve (para notas tiradas durante a reunião)
   let tAuto = null, apagada = false, ultimo = JSON.stringify(recolher());
   const autoGuardar = async () => {
     if (apagada) return;
     const d = recolher(), j = JSON.stringify(d);
     if (j === ultimo || (!d.objetivos && !d.notas && !d.tarefas.length && !d.local)) return;
-    ultimo = j; try { await guardar("reunioes", id, d); const e = $("#rEstado", el); if (e) e.textContent = "Guardado às " + new Date().toTimeString().slice(0, 5); } catch (err) {}
+    ultimo = j; try { await guardar("reunioes", id, d); sincronizarTarefas(id, d); const e = $("#rEstado", el); if (e) e.textContent = "Guardado às " + new Date().toTimeString().slice(0, 5); } catch (err) {}
   };
   const agendar = () => { clearTimeout(tAuto); tAuto = setTimeout(autoGuardar, 1500); };
   el.addEventListener("input", agendar); el.addEventListener("change", agendar); el.addEventListener("click", ev => { if (ev.target.closest("#rTipo, #rPart")) agendar(); });
@@ -1816,9 +1885,9 @@ function formReuniao(id) {
   new MutationObserver((m, o) => { if (!el.isConnected) { o.disconnect(); clearTimeout(tAuto); autoGuardar(); } }).observe(document.body, { childList: true });
   $("#rOk", el).addEventListener("click", async () => {
     clearTimeout(tAuto); const d = recolher(); ultimo = JSON.stringify(d);
-    try { await guardar("reunioes", id, d); fecharFolha(); toast("Reunião guardada"); } catch (e) {}
+    try { await guardar("reunioes", id, d); await sincronizarTarefas(id, d); fecharFolha(); toast("Reunião guardada"); } catch (e) {}
   });
-  $("#rDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { clearTimeout(tAuto); apagada = true; apagar("reunioes", id); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
+  $("#rDel", el)?.addEventListener("click", ev => { const b = ev.currentTarget; if (b.dataset.armed) { clearTimeout(tAuto); apagada = true; apagar("reunioes", id); Object.entries(S.tarefas).forEach(([tid, x]) => { if (x.reuniaoId === id) apagar("tarefas", tid); }); fecharFolha(); } else { b.dataset.armed = 1; b.textContent = "Confirmar apagar"; } });
 }
 function viewPessoas() {
   if (!podeEscrever()) return "";
@@ -2035,7 +2104,9 @@ $("#view").addEventListener("click", e => {
     guardar("plano", "config", cfg).then(() => toast("Tema apagado"), () => {}); return;
   }
   const tk = e.target.closest("[data-tarefa]");
-  if (tk) { const [rid, i] = tk.dataset.tarefa.split("|"); const r = JSON.parse(JSON.stringify(S.reunioes[rid])); r.tarefas[+i].feito = !r.tarefas[+i].feito; guardar("reunioes", rid, r).then(() => toast(r.tarefas[+i].feito ? "Tarefa concluída" : "Tarefa reaberta"), () => {}); return; }
+  if (tk) { const [rid, i] = tk.dataset.tarefa.split("|"); const r = JSON.parse(JSON.stringify(S.reunioes[rid])); const t = r.tarefas[+i]; t.feito = !tarefaFeita(t); t.mudouEm = Date.now(); guardar("reunioes", rid, r).then(() => { sincronizarTarefas(rid, r); toast(t.feito ? "Tarefa concluída" : "Tarefa reaberta"); }, () => {}); return; }
+  const mt = e.target.closest("[data-minha]");
+  if (mt) { const id = mt.dataset.minha, t = { ...S.tarefas[id] }; t.feito = mt.checked; t.mudouEm = Date.now(); t.feitoEm = t.feito ? Date.now() : null; t.feitoPor = t.feito ? meuEmail : null; guardar("tarefas", id, t).then(() => toast(t.feito ? "Tarefa concluída. O João vai ver." : "Tarefa reaberta"), () => {}); return; }
   if (e.target.id === "relCopiar") { const t = textoRelatorio(); try { navigator.clipboard.writeText(t).then(() => toast("Relatório copiado"), () => abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`)); } catch (err) { abrirFolha(`<h2>Relatório</h2><textarea style="min-height:300px">${esc(t)}</textarea><div class="actions"><button class="btn" data-close>Fechar</button></div>`); } return; }
   if (e.target.id === "entrar") return formLogin();
   if (e.target.id === "sair") { sb.auth.signOut(); return; }
@@ -2125,7 +2196,7 @@ function formLogin() {
 }
 
 // ---------- arranque ----------
-let meuId = null;
+let meuId = null, meuEmail = "", temTarefas = false;
 const COLS_PUBLICAS = ["equipas", "exercicios", "plano", "sessoes", "alteracoes", "avaliacoes"];
 const COLS_EQUIPA = ["notas", "atletas", "pessoas", "planos", "material", "planeadas", "semanas"];
 S.acessos = {};
@@ -2133,6 +2204,8 @@ async function carregar(col) {
   const out = {};
   for (let de = 0; ; de += 1000) {
     const { data, error } = await sb.from(col).select(col === "acessos" ? "id,papel,nome" : "id,data").range(de, de + 999);
+    if (error && col === "tarefas") { console.warn("Tabela tarefas ainda não existe", error); temTarefas = false; return; }
+    if (col === "tarefas") temTarefas = true;
     if (error) { console.error("Erro ao carregar " + col, error); toast("Não foi possível carregar os dados: " + erroPT(error)); break; }
     if (!data) break;
     data.forEach(r => out[r.id] = col === "acessos" ? { papel: r.papel, nome: r.nome } : r.data);
@@ -2141,7 +2214,7 @@ async function carregar(col) {
   S[col] = out;
 }
 async function definirPapel() {
-  role = { nivel: "view", nome: "Consulta" }; meuId = sessao?.user?.id || null;
+  role = { nivel: "view", nome: "Consulta" }; meuId = sessao?.user?.id || null; meuEmail = (sessao?.user?.email || "").toLowerCase();
   if (!sessao) return;
   const { data } = await sb.from("acessos").select("papel").eq("id", sessao.user.email.toLowerCase()).maybeSingle();
   if (data?.papel === "administrador") role = { nivel: "dono", nome: "Administrador" };
@@ -2151,10 +2224,10 @@ async function definirPapel() {
 }
 async function carregarTudo() {
   await definirPapel();
-  const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA : []).concat(role.nivel === "dono" ? ["acessos", "reunioes"] : []);
-  COLS_EQUIPA.concat(["acessos", "reunioes"]).forEach(c => { if (!cols.includes(c)) S[c] = {}; });
+  const cols = COLS_PUBLICAS.concat(role.nivel !== "view" ? COLS_EQUIPA.concat("tarefas") : []).concat(role.nivel === "dono" ? ["acessos", "reunioes"] : []);
+  COLS_EQUIPA.concat(["acessos", "reunioes", "tarefas"]).forEach(c => { if (!cols.includes(c)) S[c] = {}; });
   await Promise.all(cols.map(carregar).concat(carregarHistorico()));
-  render();
+  render(); avisarTarefas();
 }
 try { const t = localStorage.getItem("em_tab"); if (t) tab = t; } catch (e) {}
 document.getElementById("role").addEventListener("click", () => { if (role.nivel === "dono") return escolherVista(); if (!sb) return; if (sessao) { maisSec = "acessos"; tab = "mais"; render(); return scrollTo(0, 0); } else formLogin(); });
