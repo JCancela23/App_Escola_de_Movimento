@@ -569,57 +569,184 @@ function barras(obj, cor, total) {
   return Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
     `<div class="row"><span class="m">${esc(k)}</span><span class="t">${n}</span></div><div class="bar"><i style="width:${n / (total || 1) * 100}%;background:${cor}"></i></div>`).join("");
 }
-// Exportação para Excel (só o administrador). A biblioteca só é carregada quando se exporta.
-function carregarXLSX() {
-  if (window.XLSX) return Promise.resolve();
-  return new Promise((ok, erro) => { const sc = document.createElement("script"); sc.src = "vendor/xlsx-0.18.5.mini.min.js"; sc.onload = ok; sc.onerror = () => erro(new Error("Não foi possível carregar o exportador")); document.head.appendChild(sc); });
+// Exportação para Excel (só o administrador), para o SharePoint. A biblioteca só é carregada quando se exporta.
+function carregarExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise((ok, erro) => { const sc = document.createElement("script"); sc.src = "vendor/exceljs-4.4.0.min.js"; sc.onload = ok; sc.onerror = () => erro(new Error("Não foi possível carregar o exportador")); document.head.appendChild(sc); });
 }
 async function exportarExcel() {
   if (!eDono()) return;
-  try { await carregarXLSX(); } catch (e) { return toast(e.message); }
-  const dt = iso => iso ? new Date(iso + "T12:00") : null, nTema = l => l.map(nomeTema).join(", ");
-  const ep = epocaVista(), naEpoca = iso => iso && epocaDe(iso) === ep;
-  const eqs = Object.entries(S.equipas).sort((a, b) => equipaNome(a[0]).localeCompare(equipaNome(b[0])));
-  const sess = Object.entries(S.sessoes).filter(([, x]) => naEpoca(x.data)).sort((a, b) => a[1].data.localeCompare(b[1].data) || (a[1].hora || "").localeCompare(b[1].hora || ""));
-  const folhas = [];
-  const add = (nome, cab, linhas, larg) => folhas.push({ nome, cab, linhas, larg });
-  // Resumo
-  const por = {}; sess.forEach(([, x]) => { const k = equipaNome(x.equipaId), o = por[k] = por[k] || [0, 0, 0]; if (x.estado === "dada") { o[0]++; o[2] += +x.nAtletas || 0; } else o[1]++; });
-  const res = Object.entries(por).sort().map(([k, [a, b, c]]) => [k, a, b, a + b ? Math.round(a / (a + b) * 100) : 0, a ? Math.round(c / a * 10) / 10 : null]);
-  const ta = res.reduce((t, r) => t + r[1], 0), tb = res.reduce((t, r) => t + r[2], 0), tc = sess.filter(([, x]) => x.estado === "dada").reduce((t, [, x]) => t + (+x.nAtletas || 0), 0);
-  res.push(["TOTAL", ta, tb, ta + tb ? Math.round(ta / (ta + tb) * 100) : 0, ta ? Math.round(tc / ta * 10) / 10 : null]);
-  const mot = {}; sess.filter(([, x]) => x.estado !== "dada").forEach(([, x]) => { const m = x.motivo || "Outro"; mot[m] = (mot[m] || 0) + 1; });
-  res.push([], ["Motivos das não realizadas", "Sessões"], ...Object.entries(mot).sort((a, b) => b[1] - a[1]));
-  add("Resumo", ["Modalidade / escalão", "Realizadas", "Não realizadas", "Cumprimento (%)", "Média de atletas"], res, [34, 12, 15, 16, 16]);
-  add("Sessões", ["ID", "Data", "Hora", "Modalidade", "Escalão", "Local", "Duração (min)", "Realizada", "Nº atletas", "Como correu", "Plano", "Avaliação", "Preparador físico", "Motivo (se não realizada)", "Temas", "Exercícios", "Resumo"],
-    sess.map(([id, x]) => { const e = S.equipas[x.equipaId] || {}, ok = x.estado === "dada", pid = ok && planoRegistadoId(x);
-      return [id, dt(x.data), x.hora || "", e.modalidade || "", e.escalao || "", x.local || "", +x.duracao || null, ok ? "Sim" : "Não", ok ? +x.nAtletas || 0 : null, ok ? CORREU.find(c => c.v === x.correu)?.t || "" : "", pid ? S.planos[pid]?.nome || "" : "",
-        (x.avaliacao || []).map(a => `${testes()[a.teste]?.nome || a.teste} · ${momentoDe(a)}.º momento`).join("; "), pessoaNome(x.dadaPor) || "", ok ? "" : motivoTxt(x), nTema(temasDe(x)), (x.exercicios || []).map(i => S.exercicios[i]?.nome).filter(Boolean).join(", "), x.resumo || ""]; }),
-    [16, 11, 7, 16, 18, 22, 9, 10, 9, 11, 14, 22, 16, 40, 16, 60, 30]);
-  add("Avaliações", ["ID", "Modalidade", "Escalão", "Teste", "Momento", "Data", "Atletas avaliados", "Média", "Escala"],
-    Object.entries(S.avaliacoes).filter(([, a]) => naEpoca(a.data || a.mes + "-01")).map(([id, a]) => { const e = S.equipas[a.equipaId] || {}, v = Object.values(a.resultados || {}).filter(Boolean), T = testeDe(a);
-      return [id, e.modalidade || "", e.escalao || "", T.nome + (T.exercicio ? " (" + T.exercicio + ")" : ""), momentoDe(a) + ".º", dt(a.data || a.mes + "-01"), v.length, v.length ? Math.round(v.reduce((t, y) => t + y, 0) / v.length * 100) / 100 : null, "1 a " + maxDe(a)]; })
-      .sort((a, b) => (a[5] - b[5]) || a[1].localeCompare(b[1])), [36, 16, 18, 34, 9, 11, 10, 8, 8]);
-  add("Planos", ["ID", "Nome", "Temas", "Aquecimento", "Parte principal", "Material", "Notas"],
-    Object.entries(S.planos).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, p]) => { const it = k => (p.itens || []).filter(i => parteDe(i) === k).map(i => (i.junto ? "+ " : "") + (S.exercicios[i.exercicioId]?.nome || "?") + (i.dose ? " (" + i.dose + ")" : "") + (i.rondas ? " [bloco " + i.rondas + " rondas]" : "")).join("; ");
-      return [id, p.nome, nTema(temasDe(p)), it("aquecimento"), it("principal"), (p.material || []).map(m => (S.material[m.materialId]?.nome || "") + (m.qtd ? " × " + m.qtd : "")).join("; "), p.notas || ""]; }), [18, 22, 18, 40, 60, 24, 30]);
-  add("Exercícios", ["ID", "Nome", "Tema", "Descrição", "Vídeos"], Object.entries(S.exercicios).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, x]) => [id, x.nome, TEMAS[x.tema] ? nomeTema(x.tema) : "Sem tema", x.descricao || "", videosDe(x).map(v => v.url).join(" ")]), [18, 36, 12, 60, 50]);
-  add("Equipas", ["ID", "Modalidade", "Escalão", "Preparador físico", "Treinadores", "Ativa", "Início", "Horário da Escola do Movimento"],
-    eqs.map(([id, e]) => [id, e.modalidade || "", e.escalao || "", pessoaNome(e.responsavel), (e.treinadores || []).map(pessoaNome).filter(Boolean).join(", "), e.ativa === false ? "Não" : "Sim", dt(e.inicio), horarioDe(e).map(h => `${DIAS[h.dia]} ${h.hora} ${h.local || ""} (${h.duracao || 20}')`).join("; ")]), [16, 16, 18, 16, 28, 7, 11, 60]);
-  add("Pessoas", ["ID", "Nome", "Função", "Modalidade", "Telefone", "Email"], Object.entries(S.pessoas).sort((a, b) => (a[1].nome || "").localeCompare(b[1].nome || "")).map(([id, p]) => [id, p.nome || "", p.funcao || "", p.modalidade || "", p.telefone || "", p.email || ""]), [20, 22, 24, 16, 14, 32]);
-  add("Reuniões", ["ID", "Data", "Hora", "Tipo", "Local", "Objetivos", "Notas", "Tarefas", "Tarefas feitas", "Tarefas por fazer"],
-    Object.entries(S.reunioes).sort((a, b) => (a[1].data || "").localeCompare(b[1].data || "")).map(([id, r]) => { const t = r.tarefas || [];
-      return [id, dt(r.data), r.hora || "", r.tipo === "online" ? "Online" : "Presencial", r.local || "", r.objetivos || "", r.notas || "", t.length, t.filter(x => x.feito).length, t.filter(x => !x.feito).map(x => x.texto + (x.responsavel ? " (" + pessoaNome(x.responsavel) + ")" : "")).join("; ")]; }), [18, 11, 7, 11, 22, 60, 60, 8, 9, 50]);
-  const wb = XLSX.utils.book_new();
-  const leia = [["Escola do Movimento · dados exportados da app"], ["Exportado em", new Date().toLocaleString("pt-PT")], ["Época", ep], [], ["Como atualizar no SharePoint"],
-    ["1.", "Guarde sempre este ficheiro com o mesmo nome, na mesma pasta do SharePoint, e escolha \"Substituir\"."], ["2.", "Cada linha tem um ID que nunca muda: novos registos aparecem e correções ficam atualizadas, sem duplicados."],
-    ["3.", "As versões anteriores ficam no Histórico de versões do SharePoint."], ["4.", "Os nomes dos atletas e as notas individuais não são exportados; só as médias por equipa."]];
-  const wl = XLSX.utils.aoa_to_sheet(leia, { cellDates: true }); wl["!cols"] = [{ wch: 14 }, { wch: 100 }]; XLSX.utils.book_append_sheet(wb, wl, "Leia-me");
-  folhas.forEach(f => { const ws = XLSX.utils.aoa_to_sheet([f.cab, ...f.linhas], { cellDates: true, dateNF: "dd/mm/yyyy" }); ws["!cols"] = f.larg.map(w => ({ wch: w }));
-    if (f.linhas.length && f.nome !== "Resumo") ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: f.linhas.length, c: f.cab.length - 1 } }) };
-    XLSX.utils.book_append_sheet(wb, ws, f.nome); });
-  XLSX.writeFile(wb, "Escola do Movimento - Dados.xlsx", { cellDates: true });
+  toast("A preparar o ficheiro…");
+  try { await carregarExcelJS(); } catch (e) { return toast(e.message); }
+  const wb = await construirExcel();
+  const buf = await wb.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a"); a.href = url; a.download = "Escola do Movimento - Dados.xlsx"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
   toast("Ficheiro exportado: Escola do Movimento - Dados.xlsx");
+}
+async function construirExcel() {
+  const VERDE = "FF1F6B4A", VERDE_CL = "FFE2EFE7", VERM = "FFB8432F", VERM_CL = "FFF7E1DC", AMAR = "FFB07D10", CINZA = "FF6B6B6B", BRANCO = "FFFFFFFF";
+  const dt = iso => iso ? new Date(iso + "T00:00:00Z") : null, nTema = l => l.map(nomeTema).join(", ");
+  const ep = epocaVista(), naEpoca = iso => iso && epocaDe(iso) === ep;
+  const sess = Object.entries(S.sessoes).filter(([, x]) => naEpoca(x.data) && S.equipas[x.equipaId]).sort((a, b) => a[1].data.localeCompare(b[1].data) || (a[1].hora || "").localeCompare(b[1].hora || ""));
+  const dadas = sess.filter(([, x]) => x.estado === "dada"), nao = sess.filter(([, x]) => x.estado !== "dada");
+  const avals = Object.entries(S.avaliacoes).filter(([, a]) => naEpoca(a.data || a.mes + "-01") && S.equipas[a.equipaId]);
+  const wb = new ExcelJS.Workbook(); wb.creator = "Escola do Movimento"; wb.created = new Date();
+  const fill = c => ({ type: "pattern", pattern: "solid", fgColor: { argb: c } });
+  const borda = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+  let nTab = 0;
+  // tabela formatada (filtros, faixas) a partir da linha r, coluna c
+  const tabela = (ws, r, c, cab, linhas, opt = {}) => {
+    if (!linhas.length) { ws.getCell(r, c).value = opt.vazio || "Sem dados."; ws.getCell(r, c).font = { italic: true, color: { argb: CINZA } }; return r + 1; }
+    ws.addTable({ name: "T" + (++nTab), ref: ws.getCell(r, c).address, headerRow: true, style: { theme: "TableStyleLight1", showRowStripes: false },
+      columns: cab.map(h => ({ name: h, filterButton: !opt.semFiltro })), rows: linhas });
+    // formatação explícita, para ficar igual no Excel, no Excel online e na pré-visualização do SharePoint
+    cab.forEach((h, i) => { const k = ws.getCell(r, c + i); k.fill = fill(VERDE); k.font = { bold: true, color: { argb: BRANCO } }; k.alignment = { vertical: "middle", wrapText: true }; });
+    ws.getRow(r).height = 20;
+    linhas.forEach((l, j) => cab.forEach((h, i) => { const k = ws.getCell(r + 1 + j, c + i); if (j % 2) k.fill = fill("FFF4F7F5"); k.border = { bottom: { style: "hair", color: { argb: "FFD5DDD8" } } }; k.alignment = { vertical: "top", wrapText: true }; }));
+    let fim = r + linhas.length + 1;
+    if (opt.totais) { ws.getCell(fim, c).value = "Total"; opt.totais.forEach((t, i) => { if (t === "sum") ws.getCell(fim, c + i).value = linhas.reduce((a, l) => a + (+l[i] || 0), 0); else if (typeof t === "function") ws.getCell(fim, c + i).value = t(linhas); });
+      cab.forEach((h, i) => { const k = ws.getCell(fim, c + i); k.font = { bold: true }; k.border = { top: { style: "medium", color: { argb: VERDE } } }; }); fim++; }
+    return fim;
+  };
+  const barras = (ws, ref, cor = VERDE) => ws.addConditionalFormatting({ ref, rules: [{ type: "dataBar", minLength: 0, maxLength: 100, gradient: false, cfvo: [{ type: "num", value: 0 }, { type: "max" }], color: { argb: cor } }] });
+  const escala = (ws, ref, min = 1, max = 3) => ws.addConditionalFormatting({ ref, rules: [{ type: "colorScale", cfvo: [{ type: "num", value: min }, { type: "num", value: (min + max) / 2 }, { type: "num", value: max }], color: [{ argb: "FFF4B6A8" }, { argb: "FFFFF1B8" }, { argb: "FF9FD6B4" }] }] });
+  const titulo = (ws, r, txt, cols = 6) => { ws.mergeCells(r, 1, r, cols); const c = ws.getCell(r, 1); c.value = txt; c.font = { bold: true, size: 13, color: { argb: VERDE } }; c.border = { bottom: { style: "medium", color: { argb: VERDE } } }; ws.getRow(r).height = 22; return r + 1; };
+  const larguras = (ws, l) => l.forEach((w, i) => ws.getColumn(i + 1).width = w);
+  const datas = (ws, cols) => cols.forEach(c => ws.getColumn(c).numFmt = "dd/mm/yyyy");
+
+  // ---------- PAINEL ----------
+  const P = wb.addWorksheet("Painel", { views: [{ showGridLines: false }], properties: { tabColor: { argb: VERDE } } });
+  larguras(P, [30, 13, 15, 14, 26, 14]);
+  P.mergeCells("A1:F1"); P.getCell("A1").value = "Escola do Movimento"; P.getCell("A1").font = { bold: true, size: 22, color: { argb: BRANCO } }; P.getCell("A1").fill = fill(VERDE); P.getCell("A1").alignment = { vertical: "middle", indent: 1 }; P.getRow(1).height = 38;
+  P.mergeCells("A2:F2"); P.getCell("A2").value = `Época ${ep} · dados exportados da app a ${new Date().toLocaleString("pt-PT")}`; P.getCell("A2").font = { color: { argb: CINZA } };
+  const fech = dadas.length + nao.length, pres = dadas.reduce((t, [, x]) => t + (+x.nAtletas || 0), 0);
+  const avaliados = new Set(); avals.forEach(([, a]) => Object.entries(a.resultados || {}).forEach(([aid, v]) => v && avaliados.add(aid)));
+  const kpis = [["Sessões realizadas", dadas.length, VERDE], ["Não realizadas", nao.length, VERM], ["Cumprimento", fech ? dadas.length / fech : 0, VERDE, "0%"], ["Presenças", pres, VERDE], ["Média de atletas", dadas.length ? pres / dadas.length : 0, VERDE, "0.0"], ["Atletas avaliados", avaliados.size, AMAR]];
+  // 6 cartões: 3 por linha (colunas B-D e B-D... usamos A..F em pares)
+  kpis.forEach(([nome, v, cor, fmt], i) => { const r = 4 + Math.floor(i / 3) * 3, c = 1 + (i % 3) * 2, c2 = c + 1;
+    P.mergeCells(r, c, r, c2); P.mergeCells(r + 1, c, r + 1, c2);
+    const a = P.getCell(r, c), b = P.getCell(r + 1, c);
+    a.value = v; if (fmt) a.numFmt = fmt; a.font = { bold: true, size: 24, color: { argb: cor } }; a.alignment = { horizontal: "center", vertical: "middle" }; a.fill = fill("FFF6F8F7");
+    b.value = nome.toUpperCase(); b.font = { size: 9, bold: true, color: { argb: CINZA } }; b.alignment = { horizontal: "center" }; b.fill = fill("FFF6F8F7");
+    P.getRow(r).height = 36; });
+  let r = 11;
+  // por modalidade
+  const porMod = {}; sess.forEach(([, x]) => { const k = equipaNome(x.equipaId), o = porMod[k] = porMod[k] || { s: 0, n: 0, p: 0 }; if (x.estado === "dada") { o.s++; o.p += +x.nAtletas || 0; } else o.n++; });
+  r = titulo(P, r, "Sessões por modalidade");
+  const lm = Object.entries(porMod).sort((a, b) => b[1].s - a[1].s).map(([k, o]) => [k, o.s, o.n, o.s + o.n ? o.s / (o.s + o.n) : 0, o.s ? Math.round(o.p / o.s * 10) / 10 : 0]);
+  let r0 = r; r = tabela(P, r, 1, ["Modalidade / escalão", "Realizadas", "Não realizadas", "Cumprimento", "Média de atletas"], lm, { semFiltro: true, totais: [null, "sum", "sum", L => { const a = L.reduce((t, l) => t + l[1], 0), b = L.reduce((t, l) => t + l[2], 0); return a + b ? a / (a + b) : 0; }, () => dadas.length ? Math.round(pres / dadas.length * 10) / 10 : 0] });
+  if (lm.length) { barras(P, `B${r0 + 1}:B${r0 + lm.length}`); barras(P, `C${r0 + 1}:C${r0 + lm.length}`, VERM); for (let i = 1; i <= lm.length + 1; i++) P.getCell(r0 + i, 4).numFmt = "0%"; }
+  r += 1;
+  // por mês
+  const porMes = {}; sess.forEach(([, x]) => { const k = x.data.slice(0, 7), o = porMes[k] = porMes[k] || { s: 0, n: 0, p: 0 }; if (x.estado === "dada") { o.s++; o.p += +x.nAtletas || 0; } else o.n++; });
+  r = titulo(P, r, "Sessões por mês");
+  const lme = Object.keys(porMes).sort().map(k => { const o = porMes[k]; return [mesNome(k), o.s, o.n, o.s + o.n ? o.s / (o.s + o.n) : 0, o.p]; });
+  r0 = r; r = tabela(P, r, 1, ["Mês", "Realizadas", "Não realizadas", "Cumprimento", "Presenças"], lme, { semFiltro: true, totais: [null, "sum", "sum", L => { const a = L.reduce((t, l) => t + l[1], 0), b = L.reduce((t, l) => t + l[2], 0); return a + b ? a / (a + b) : 0; }, "sum"] });
+  if (lme.length) { barras(P, `B${r0 + 1}:B${r0 + lme.length}`); barras(P, `C${r0 + 1}:C${r0 + lme.length}`, VERM); for (let i = 1; i <= lme.length + 1; i++) P.getCell(r0 + i, 4).numFmt = "0%"; }
+  r += 1;
+  // por preparador físico
+  const porPF = {}; sess.forEach(([, x]) => { const k = pessoaNome(x.dadaPor) || "Sem indicação", o = porPF[k] = porPF[k] || { s: 0, n: 0, p: 0, m: new Set() }; if (x.estado === "dada") { o.s++; o.p += +x.nAtletas || 0; o.m.add(S.equipas[x.equipaId]?.modalidade); } else o.n++; });
+  r = titulo(P, r, "Sessões por preparador físico");
+  const lpf = Object.entries(porPF).sort((a, b) => b[1].s - a[1].s).map(([k, o]) => [k, o.s, o.n, o.p, [...o.m].filter(Boolean).sort().join(", ")]);
+  r0 = r; r = tabela(P, r, 1, ["Preparador físico", "Realizadas", "Não realizadas", "Presenças", "Modalidades"], lpf, { semFiltro: true, totais: [null, "sum", "sum", "sum", null] });
+  if (lpf.length) barras(P, `B${r0 + 1}:B${r0 + lpf.length}`);
+  r += 1;
+  // quadros cruzados: modalidade × mês e preparador × mês (sessões realizadas)
+  const meses = Object.keys(porMes).sort();
+  const cruz = (tit, chave, rot) => { if (!meses.length) return;
+    const m = {}; dadas.forEach(([, x]) => { const k = chave(x); (m[k] = m[k] || {})[x.data.slice(0, 7)] = (m[k][x.data.slice(0, 7)] || 0) + 1; });
+    const lin = Object.keys(m).sort().map(k => [k, ...meses.map(me => m[k][me] || 0), meses.reduce((t, me) => t + (m[k][me] || 0), 0)]);
+    r = titulo(P, r, tit); const q = r;
+    r = tabela(P, r, 1, [rot, ...meses.map(me => mesNome(me).replace(/ \d{4}$/, "")), "Total"], lin, { semFiltro: true, totais: [null, ...meses.map(() => "sum"), "sum"] });
+    P.addConditionalFormatting({ ref: `B${q + 1}:${P.getColumn(1 + meses.length).letter}${q + lin.length}`, rules: [{ type: "colorScale", cfvo: [{ type: "num", value: 0 }, { type: "max" }], color: [{ argb: "FFFFFFFF" }, { argb: "FF6FBF8E" }] }] });
+    for (let i = 2; i <= meses.length + 2; i++) for (let j = q; j <= r; j++) P.getCell(j, i).alignment = { horizontal: "center", vertical: "middle" };
+    r += 1; };
+  cruz("Sessões realizadas por modalidade e mês", x => equipaNome(x.equipaId), "Modalidade / escalão");
+  cruz("Sessões realizadas por preparador físico e mês", x => pessoaNome(x.dadaPor) || "Sem indicação", "Preparador físico");
+  // motivos
+  const mot = {}; nao.forEach(([, x]) => { const m = x.motivo || "Outro"; mot[m] = (mot[m] || 0) + 1; });
+  r = titulo(P, r, "Motivos das sessões não realizadas");
+  const lmo = Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v, nao.length ? v / nao.length : 0]);
+  r0 = r; r = tabela(P, r, 1, ["Motivo", "Sessões", "% das não realizadas"], lmo, { semFiltro: true, vazio: "Nenhuma sessão por realizar." });
+  if (lmo.length) { barras(P, `B${r0 + 1}:B${r0 + lmo.length}`, VERM); for (let i = 1; i <= lmo.length; i++) P.getCell(r0 + i, 3).numFmt = "0%"; }
+  const outros = nao.filter(([, x]) => x.motivo === "Outro" && x.motivoDetalhe);
+  if (outros.length) { P.getCell(r, 1).value = "Explicações de \"Outro\":"; P.getCell(r, 1).font = { bold: true, size: 10 }; r++;
+    outros.forEach(([, x]) => { P.mergeCells(r, 1, r, 6); P.getCell(r, 1).value = `${dataCurta(x.data)} · ${equipaNome(x.equipaId)}: ${x.motivoDetalhe}`; P.getCell(r, 1).alignment = { wrapText: true }; P.getCell(r, 1).font = { size: 10, color: { argb: CINZA } }; P.getRow(r).height = x.motivoDetalhe.length > 90 ? 28 : 15; r++; }); }
+  r += 1;
+  // avaliações por equipa
+  r = titulo(P, r, "Avaliações por equipa");
+  const lav = avals.map(([, a]) => { const v = Object.values(a.resultados || {}).filter(Boolean), mx = maxDe(a); return [equipaNome(a.equipaId), testeDe(a).nome, momentoDe(a) + ".º", dt(a.data || a.mes + "-01"), v.length, v.length ? Math.round(v.reduce((t, y) => t + y, 0) / v.length * 100) / 100 : null, v.length ? v.filter(y => y === mx).length / v.length : 0]; }).sort((a, b) => a[0].localeCompare(b[0]) || a[2].localeCompare(b[2]));
+  r0 = r; r = tabela(P, r, 1, ["Equipa", "Teste", "Momento", "Data", "Avaliados", "Média", "% nível máximo"], lav, { semFiltro: true, vazio: "Ainda não há avaliações." });
+  if (lav.length) { escala(P, `F${r0 + 1}:F${r0 + lav.length}`); for (let i = 1; i <= lav.length; i++) { P.getCell(r0 + i, 4).numFmt = "dd/mm/yyyy"; P.getCell(r0 + i, 7).numFmt = "0%"; } P.getColumn(7).width = 15; }
+  r += 1;
+  P.mergeCells(r, 1, r, 6); P.getCell(r, 1).value = "Para atualizar: exportar na app e carregar para a mesma pasta do SharePoint com o mesmo nome, escolhendo \"Substituir\". As versões anteriores ficam no Histórico de versões.";
+  P.getCell(r, 1).font = { italic: true, size: 9, color: { argb: CINZA } }; P.getCell(r, 1).alignment = { wrapText: true }; P.getRow(r).height = 26;
+
+  // ---------- SESSÕES ----------
+  const WS = wb.addWorksheet("Sessões", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WS, [11, 7, 16, 18, 22, 8, 10, 9, 11, 14, 22, 16, 40, 16, 60, 30, 16]); datas(WS, [1]);
+  tabela(WS, 1, 1, ["Data", "Hora", "Modalidade", "Escalão", "Local", "Duração", "Realizada", "Atletas", "Como correu", "Plano", "Avaliação", "Preparador físico", "Motivo (se não realizada)", "Temas", "Exercícios", "Resumo", "ID"],
+    sess.map(([id, x]) => { const e = S.equipas[x.equipaId] || {}, ok = x.estado === "dada", pid = ok && planoRegistadoId(x);
+      return [dt(x.data), x.hora || "", e.modalidade || "", e.escalao || "", x.local || "", +x.duracao || null, ok ? "Sim" : "Não", ok ? +x.nAtletas || 0 : null, ok ? CORREU.find(c => c.v === x.correu)?.t || "" : "", pid ? S.planos[pid]?.nome || "" : "",
+        (x.avaliacao || []).map(a => `${testes()[a.teste]?.nome || a.teste} · ${momentoDe(a)}.º momento`).join("; "), pessoaNome(x.dadaPor) || "", ok ? "" : motivoTxt(x), nTema(temasDe(x)), (x.exercicios || []).map(i => S.exercicios[i]?.nome).filter(Boolean).join(", "), x.resumo || "", id]; }));
+  const marca = (ws, col, n, mapa) => { for (let i = 2; i <= n + 1; i++) { const k = ws.getCell(i, col), m = mapa[k.value]; if (m) { k.fill = fill(m[0]); k.font = { bold: true, color: { argb: m[1] } }; k.alignment = { horizontal: "center", vertical: "top" }; } } };
+  marca(WS, 7, sess.length, { "Sim": [VERDE_CL, VERDE], "Não": [VERM_CL, VERM] });
+
+  // ---------- AVALIAÇÕES (por atleta) ----------
+  const WA = wb.addWorksheet("Avaliações", { views: [{ state: "frozen", ySplit: 1 }] });
+  const porAt = {}; avals.forEach(([, a]) => Object.entries(a.resultados || {}).forEach(([aid, v]) => { if (!v || !S.atletas[aid]) return; const k = aid + "|" + (a.teste || a.tema), o = porAt[k] = porAt[k] || { aid, a }; o["m" + momentoDe(a)] = v; o["d" + momentoDe(a)] = a.datas?.[aid] || a.data; o.max = maxDe(a); }));
+  const lat = Object.values(porAt).map(o => { const at = S.atletas[o.aid], e = S.equipas[at.equipaId] || {}; return [at.nome, e.modalidade || "", e.escalao || "", testeDe(o.a).nome, o.m1 || null, dt(o.d1), o.m2 || null, dt(o.d2), o.m1 && o.m2 ? o.m2 - o.m1 : null, "1 a " + o.max]; })
+    .sort((a, b) => a[1].localeCompare(b[1]) || a[2].localeCompare(b[2]) || a[0].localeCompare(b[0]));
+  larguras(WA, [26, 16, 18, 12, 13, 12, 13, 12, 10, 8]); datas(WA, [6, 8]);
+  tabela(WA, 1, 1, ["Atleta", "Modalidade", "Escalão", "Teste", "1.º momento", "Data 1.º", "2.º momento", "Data 2.º", "Evolução", "Escala"], lat, { vazio: "Ainda não há avaliações." });
+  if (lat.length) { escala(WA, `E2:E${lat.length + 1}`); escala(WA, `G2:G${lat.length + 1}`); WA.getColumn(9).numFmt = "+0;-0;0"; }
+
+  // ---------- ATLETAS ----------
+  const WT = wb.addWorksheet("Atletas", { views: [{ state: "frozen", ySplit: 1 }] });
+  const lt = Object.entries(S.atletas).filter(([, a]) => S.equipas[a.equipaId]).map(([id, a]) => { const e = S.equipas[a.equipaId]; const n = avals.filter(([, v]) => v.resultados?.[id]).length; return [a.nome, e.modalidade || "", e.escalao || "", n ? "Sim" : "Não", id]; })
+    .sort((a, b) => a[1].localeCompare(b[1]) || a[2].localeCompare(b[2]) || a[0].localeCompare(b[0]));
+  larguras(WT, [28, 18, 20, 10, 18]);
+  tabela(WT, 1, 1, ["Atleta", "Modalidade", "Escalão", "Avaliado", "ID"], lt, { vazio: "Ainda não há atletas." });
+  marca(WT, 4, lt.length, { "Sim": [VERDE_CL, VERDE], "Não": ["FFF2F2F2", CINZA] });
+
+  // ---------- PLANOS ----------
+  const WPl = wb.addWorksheet("Planos", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WPl, [22, 18, 45, 65, 24, 30, 18]);
+  tabela(WPl, 1, 1, ["Plano", "Temas", "Aquecimento", "Parte principal", "Material", "Notas", "ID"],
+    Object.entries(S.planos).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, p]) => { const it = k => (p.itens || []).filter(i => parteDe(i) === k).map(i => (i.junto ? "  + " : "• ") + (S.exercicios[i.exercicioId]?.nome || "?") + (i.dose ? " (" + i.dose + ")" : "") + (i.rondas ? " [bloco de " + i.rondas + " rondas]" : "")).join("\n");
+      return [p.nome, nTema(temasDe(p)), it("aquecimento"), it("principal"), (p.material || []).map(m => (S.material[m.materialId]?.nome || "") + (m.qtd ? " × " + m.qtd : "")).join("\n"), p.notas || "", id]; }));
+  // ---------- EXERCÍCIOS ----------
+  const WE = wb.addWorksheet("Exercícios", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WE, [34, 12, 70, 50, 18]);
+  tabela(WE, 1, 1, ["Exercício", "Tema", "Descrição", "Vídeos", "ID"], Object.entries(S.exercicios).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, x]) => [x.nome, TEMAS[x.tema] ? nomeTema(x.tema) : "Sem tema", x.descricao || "", videosDe(x).map(v => (v.nome ? v.nome + ": " : "") + v.url).join("\n"), id]));
+  // ---------- EQUIPAS ----------
+  const WQ = wb.addWorksheet("Equipas", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WQ, [16, 18, 16, 30, 8, 11, 55, 10, 16]); datas(WQ, [6]);
+  tabela(WQ, 1, 1, ["Modalidade", "Escalão", "Preparador físico", "Treinadores", "Ativa", "Início", "Horário da Escola do Movimento", "Atletas", "ID"],
+    Object.entries(S.equipas).sort((a, b) => equipaNome(a[0]).localeCompare(equipaNome(b[0]))).map(([id, e]) => [e.modalidade || "", e.escalao || "", pessoaNome(e.responsavel), (e.treinadores || []).map(pessoaNome).filter(Boolean).join(", "), e.ativa === false ? "Não" : "Sim", dt(e.inicio), horarioDe(e).map(h => `${DIAS[h.dia]} ${h.hora} · ${h.local || ""} (${h.duracao || 20}')`).join("\n"), Object.values(S.atletas).filter(a => a.equipaId === id).length, id]));
+  // ---------- PESSOAS ----------
+  const WP = wb.addWorksheet("Pessoas", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WP, [24, 26, 18, 15, 32, 20]);
+  tabela(WP, 1, 1, ["Nome", "Função", "Modalidade", "Telefone", "Email", "ID"], Object.entries(S.pessoas).sort((a, b) => (a[1].nome || "").localeCompare(b[1].nome || "")).map(([id, p]) => [p.nome || "", p.funcao || "", p.modalidade || "", p.telefone || "", p.email || "", id]));
+  // ---------- REUNIÕES e TAREFAS ----------
+  const reun = Object.entries(S.reunioes).sort((a, b) => (a[1].data || "").localeCompare(b[1].data || ""));
+  const WR = wb.addWorksheet("Reuniões", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WR, [11, 7, 11, 22, 24, 60, 60, 9, 18]); datas(WR, [1]);
+  tabela(WR, 1, 1, ["Data", "Hora", "Tipo", "Local", "Participantes", "Objetivos", "Notas", "Tarefas feitas", "ID"],
+    reun.map(([id, x]) => { const t = x.tarefas || []; return [dt(x.data), x.hora || "", x.tipo === "online" ? "Online" : "Presencial", x.local || "", (x.participantes || []).map(pessoaNome).filter(Boolean).join(", "), x.objetivos || "", x.notas || "", `${t.filter(y => y.feito).length} de ${t.length}`, id]; }), { vazio: "Ainda não há reuniões." });
+  const WTa = wb.addWorksheet("Tarefas", { views: [{ state: "frozen", ySplit: 1 }] });
+  const lta = reun.flatMap(([id, x]) => (x.tarefas || []).map(t => [dt(x.data), t.texto || "", pessoaNome(t.responsavel) || "", dt(t.prazo), t.feito ? "Feita" : "Por fazer"]));
+  larguras(WTa, [13, 60, 18, 11, 11]); datas(WTa, [1, 4]);
+  tabela(WTa, 1, 1, ["Reunião de", "Tarefa", "Responsável", "Prazo", "Estado"], lta, { vazio: "Sem tarefas." });
+  marca(WTa, 5, lta.length, { "Por fazer": ["FFFFF1B8", AMAR], "Feita": [VERDE_CL, VERDE] });
+  // ---------- MATERIAL ----------
+  const WM = wb.addWorksheet("Material", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WM, [28, 11, 60, 16, 18]);
+  tabela(WM, 1, 1, ["Material", "Quantidade", "Onde está", "Estado", "ID"], Object.entries(S.material).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, m]) => [m.nome, +m.quantidade || m.quantidade || null, m.local || "", m.estado || "", id]), { vazio: "Sem material registado." });
+  wb.eachSheet(ws => { ws.pageSetup = { paperSize: 9, orientation: ws.name === "Painel" ? "portrait" : "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } }; if (ws.name !== "Painel") ws.pageSetup.printTitlesRow = "1:1"; });
+  return wb;
 }
 function viewRelatorio() {
   const R = calcRelatorio(), fechadas = R.dadas.length + R.nao.length;
