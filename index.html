@@ -599,8 +599,10 @@ async function construirExcel() {
   // tabela formatada (filtros, faixas) a partir da linha r, coluna c
   const tabela = (ws, r, c, cab, linhas, opt = {}) => {
     if (!linhas.length) { ws.getCell(r, c).value = opt.vazio || "Sem dados."; ws.getCell(r, c).font = { italic: true, color: { argb: CINZA } }; return r + 1; }
-    ws.addTable({ name: "T" + (++nTab), ref: ws.getCell(r, c).address, headerRow: true, style: { theme: "TableStyleLight1", showRowStripes: false },
-      columns: cab.map(h => ({ name: h, filterButton: !opt.semFiltro })), rows: linhas });
+    // células simples (sem "tabelas" do Excel, que o Excel do Mac tentava reparar ao abrir); filtros com autoFilter
+    cab.forEach((h, i) => ws.getCell(r, c + i).value = h);
+    linhas.forEach((l, j) => l.forEach((v, i) => ws.getCell(r + 1 + j, c + i).value = v));
+    if (!opt.semFiltro) ws.autoFilter = { from: { row: r, column: c }, to: { row: r + linhas.length, column: c + cab.length - 1 } };
     // formatação explícita, para ficar igual no Excel, no Excel online e na pré-visualização do SharePoint
     cab.forEach((h, i) => { const k = ws.getCell(r, c + i); k.fill = fill(VERDE); k.font = { bold: true, color: { argb: BRANCO } }; k.alignment = { vertical: "middle", wrapText: true }; });
     ws.getRow(r).height = 20;
