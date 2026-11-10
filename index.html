@@ -137,6 +137,14 @@ textarea.iObs, textarea[rows="1"] { min-height: 44px }
 .junto { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--accent); font-weight: 600 }
 .blocov { border: 2px solid var(--accent); border-radius: 12px; padding: 8px; display: grid; gap: 6px }
 .blocov > .lblb { font-weight: 700; color: var(--accent); font-size: 14px }
+.simult { border: 2px dashed var(--accent); border-radius: 12px; padding: 8px; display: grid; gap: 8px }
+.simult > .lblb { font-weight: 700; color: var(--accent); font-size: 14px }
+.grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px }
+.grupo { background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 10px; padding: 6px; display: grid; gap: 6px; align-content: start }
+.grupo > .gt { font-weight: 700; font-size: 15px }
+.trocab { font-weight: 700; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 10px; padding: 6px 10px; font-size: 14px }
+.iGrupoL { display: flex; gap: 8px; align-items: center; font-size: 14px }
+.iGrupoL select { width: auto; flex: 0 0 auto }
 .seg { display: flex; flex-wrap: wrap; gap: 6px }
 .seg button { flex: 1 1 auto; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; cursor: pointer; min-height: 44px; font-weight: 500 }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600 }
@@ -717,8 +725,8 @@ async function construirExcel() {
   const WPl = wb.addWorksheet("Planos", { views: [{ state: "frozen", ySplit: 1 }] });
   larguras(WPl, [22, 18, 45, 65, 24, 30, 18]);
   tabela(WPl, 1, 1, ["Plano", "Temas", "Aquecimento", "Parte principal", "Material", "Notas", "ID"],
-    Object.entries(S.planos).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, p]) => { const it = k => (p.itens || []).filter(i => parteDe(i) === k).map(i => (i.junto ? "  + " : "• ") + (S.exercicios[i.exercicioId]?.nome || "?") + (i.dose ? " (" + i.dose + ")" : "") + (i.rondas ? " [bloco de " + i.rondas + " rondas]" : "")).join("\n");
-      return [p.nome, nTema(temasDe(p)), it("aquecimento"), it("principal"), (p.material || []).map(m => (S.material[m.materialId]?.nome || "") + (m.qtd ? " × " + m.qtd : "")).join("\n"), p.notas || "", id]; }));
+    Object.entries(S.planos).sort((a, b) => a[1].nome.localeCompare(b[1].nome)).map(([id, p]) => { const it = k => (p.itens || []).filter(i => parteDe(i) === k).map(i => (i.junto ? "  + " : "• ") + (S.exercicios[i.exercicioId]?.nome || "?") + (i.dose ? " (" + i.dose + ")" : "") + (i.rondas ? " [bloco de " + i.rondas + " rondas]" : "") + (i.grupo ? " [Grupo " + i.grupo + "]" : "")).join("\n");
+      return [p.nome, nTema(temasDe(p)), it("aquecimento"), it("principal"), (p.material || []).map(m => (S.material[m.materialId]?.nome || "") + (m.qtd ? " × " + m.qtd : "")).join("\n"), [orgTxt(p.organizacao), p.troca?.valor ? "Trocam de grupo ao fim de " + p.troca.valor + " min" : "", p.troca?.vezes ? p.troca.vezes + " passagem(ns) por grupo" : "", p.notas || ""].filter(Boolean).join("\n"), id]; }));
   // ---------- EXERCÍCIOS ----------
   const WE = wb.addWorksheet("Exercícios", { views: [{ state: "frozen", ySplit: 1 }] });
   larguras(WE, [34, 12, 70, 50, 18]);
@@ -1143,15 +1151,26 @@ function planoDaSessao(equipaId, data) {
 }
 const PARTES = [["aquecimento", "Aquecimento"], ["principal", "Parte principal"]];
 const parteDe = i => i.parte === "aquecimento" ? "aquecimento" : "principal";
+const GRUPOS = ["A", "B", "C", "D", "E", "F"];
+const ORGS = [["", "Não indicado"], ["individual", "Individual"], ["pares", "Em pares"], ["trios", "Em trios"], ["grupos", "Grupos de…"]];
+const orgTxt = o => !o?.tipo ? "" : o.tipo === "grupos" ? `Grupos de ${o.n || "?"} atletas` : ORGS.find(x => x[0] === o.tipo)?.[1] || "";
+const trocaTxt = (t, gs) => [t?.valor ? `🔄 Trocam de grupo ao fim de ${t.valor} min` : "", t?.vezes ? `todos passam ${t.vezes} ${t.vezes == 1 ? "vez" : "vezes"} por cada grupo (${gs.join(" → ")})` : ""].filter(Boolean).join(" · ");
 function htmlPlano(pl) {
   const itens = (pl.itens || []).filter(i => S.exercicios[i.exercicioId]);
-  const bloco = (k, nome) => { const l = itens.filter(i => parteDe(i) === k); let n = 0; return `<div class="field"><span class="lbl">${nome}</span><div class="list">${blocosDe(l).map(b => { const h = b.itens.map(i => cartaoItem(i, ++n)).join(""); return b.itens.length > 1 ? `<div class="blocov"><span class="lblb">🔗 Bloco · ${b.rondas || 1} ronda${(b.rondas || 1) > 1 ? "s" : ""} (fazer seguidos e repetir)</span>${h}</div>` : h; }).join("") || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+  let n = 0;
+  const blocosHtml = l => blocosDe(l).map(b => { const h = b.itens.map(i => cartaoItem(i, ++n)).join(""); return b.itens.length > 1 ? `<div class="blocov"><span class="lblb">🔗 Bloco · ${b.rondas || 1} ronda${(b.rondas || 1) > 1 ? "s" : ""} (fazer seguidos e repetir)</span>${h}</div>` : h; }).join("");
+  // exercícios com grupo de trabalho: caixa "Em simultâneo" no sítio do 1.º, com uma coluna por grupo
+  const parteHtml = l => { const comG = l.filter(i => i.grupo); if (!comG.length) return blocosHtml(l);
+    const gs = GRUPOS.filter(g => comG.some(i => i.grupo === g)), p = l.indexOf(comG[0]);
+    const caixa = `<div class="simult"><span class="lblb">⇆ Em simultâneo · ${gs.length} grupos de trabalho</span><div class="grupos">${gs.map(g => `<div class="grupo"><span class="gt">Grupo ${g}</span>${blocosHtml(comG.filter(i => i.grupo === g))}</div>`).join("")}</div>${trocaTxt(pl.troca, gs) ? `<span class="trocab">${trocaTxt(pl.troca, gs)}</span>` : ""}</div>`;
+    const antes = blocosHtml(l.slice(0, p).filter(i => !i.grupo)); return antes + caixa + blocosHtml(l.slice(p).filter(i => !i.grupo)); };
+  const bloco = (k, nome) => { n = 0; const l = itens.filter(i => parteDe(i) === k); return `<div class="field"><span class="lbl">${nome}</span><div class="list">${parteHtml(l) || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
   const cartaoItem = (i, n) => { const x = S.exercicios[i.exercicioId]; return `<div class="item">
       <div class="row"><span class="t">${n}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
       ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
       ${i.obs ? `<span><b>Obs.:</b> ${esc(i.obs)}</span>` : ""}
       ${videosDe(x).length ? `<div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px 16px">${linksVideo(x)}</div>` : ""}</div>`; };
-  return `${chipTema(temasDe(pl))}${PARTES.map(([k, n]) => bloco(k, n)).join("")}
+  return `${chipTema(temasDe(pl))}${orgTxt(pl.organizacao) ? `<span class="m">👥 Organização dos atletas: <b>${esc(orgTxt(pl.organizacao))}</b></span>` : ""}${PARTES.map(([k, nm]) => bloco(k, nm)).join("")}
     ${(pl.material || []).length ? `<div class="field"><span class="lbl">Material</span>${pl.material.filter(m => S.material[m.materialId]).map(m => `<span>• ${esc(S.material[m.materialId].nome)}${m.qtd ? " × " + esc(m.qtd) : ""}</span>`).join("")}</div>` : ""}
     ${pl.notas ? `<div class="field"><span class="lbl">Notas</span><span style="white-space:pre-line">${esc(pl.notas)}</span></div>` : ""}`;
 }
@@ -1206,6 +1225,7 @@ function linhaItem(i, tema) {
     <div class="blkcab" hidden><span>🔗 Bloco (exercícios seguidos) · Rondas:</span><input type="number" class="iRondas" min="1" max="20" inputmode="numeric" value="${esc(i.rondas || 2)}" aria-label="Número de rondas"></div>
     <label class="junto"><input type="checkbox" class="iJunto" ${i.junto ? "checked" : ""}> Juntar ao exercício de cima (bloco)</label>
     <div class="row"><select class="iEx" aria-label="Exercício" style="flex:1"><option value="">Escolher exercício</option>${optExercicios(i.exercicioId, tema)}</select><button class="btn ghost" data-up aria-label="Subir">↑</button><button class="btn ghost" data-rm aria-label="Tirar">✕</button></div>
+    ${parteDe(i) === "principal" ? `<label class="iGrupoL">Grupo de trabalho: <select class="iGrupo" aria-label="Grupo de trabalho"><option value="">Todos juntos</option>${GRUPOS.map(g => `<option value="${g}" ${i.grupo === g ? "selected" : ""}>Grupo ${g}</option>`).join("")}</select></label>` : ""}
     <textarea rows="1" class="iDose" placeholder="Tempo ou repetições (ex.: 3 x 10, 2 min)" aria-label="Tempo ou repetições">${esc(i.dose)}</textarea>
     <textarea class="iObs" rows="1" placeholder="Observações" aria-label="Observações">${esc(i.obs)}</textarea></div>`;
 }
@@ -1243,6 +1263,7 @@ function ligarBlocos(el) {
 const lerItens = el => { atualizarBlocos(el); return [...el.querySelectorAll("[data-item]")].map(r => {
   const it = { parte: r.dataset.parte, exercicioId: r.querySelector(".iEx").value, dose: r.querySelector(".iDose").value.trim(), obs: r.querySelector(".iObs").value.trim() };
   if (r.querySelector(".iJunto").checked) it.junto = true;
+  const g = r.querySelector(".iGrupo")?.value; if (g) it.grupo = g;
   if (!r.querySelector(".blkcab").hidden) it.rondas = Math.max(1, +r.querySelector(".iRondas").value || 2);
   return it; }).filter(i => i.exercicioId); };
 // agrupa itens seguidos em blocos [{itens, rondas}]
@@ -1261,17 +1282,24 @@ function formPlano(id, op = {}) {
     <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="plTema">${segTemas(temas)}</div></div>
     ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("")}
     ${exs.length ? "" : `<span class="m">Ainda não há exercícios na base de dados. Adicione-os em Exercícios.</span>`}
+    <div class="field"><label for="plOrg">Organização dos atletas</label><div class="row" style="gap:8px"><select id="plOrg" style="flex:1">${ORGS.map(([v, t]) => `<option value="${v}" ${(pl.organizacao?.tipo || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select><input type="number" id="plOrgN" min="2" max="30" inputmode="numeric" placeholder="nº" aria-label="Atletas por grupo" value="${esc(pl.organizacao?.n || "")}" style="width:80px" ${pl.organizacao?.tipo === "grupos" ? "" : "hidden"}></div></div>
+    <div class="field" id="plTrocaF"><span class="lbl">Troca entre grupos de trabalho</span><span class="m">Para trabalho em simultâneo, escolha o grupo (A, B, C…) em cada exercício da parte principal.</span><div class="row" style="gap:8px;justify-content:flex-start"><span>Os grupos trocam ao fim de</span><input type="number" id="plTroca" min="1" max="60" inputmode="numeric" value="${esc(pl.troca?.valor || "")}" style="width:70px" aria-label="Trocam ao fim de (min)"><span>min</span></div>
+      <div class="row" style="gap:8px;justify-content:flex-start"><span>Cada atleta passa</span><input type="number" id="plTrocaV" min="1" max="20" inputmode="numeric" value="${esc(pl.troca?.vezes || "")}" style="width:70px" aria-label="Vezes por cada grupo"><span>vez(es) por cada grupo</span></div></div>
     <div class="field"><span class="lbl">Material</span><div class="list" id="plMat">${(pl.material || []).map(linhaM).join("")}</div>${mats.length ? `<button class="btn" id="plAddM">Adicionar material</button>` : `<span class="m">Registe primeiro o material em Exercícios › Material.</span>`}</div>
     <div class="field"><label for="plNotas">Notas gerais</label><textarea id="plNotas">${esc(pl.notas)}</textarea></div>
     <div class="actions">${id ? `<button class="btn danger" id="plDel">Apagar</button>` : ""}<button class="btn" data-close>Cancelar</button><button class="btn primary" id="plOk">Guardar</button></div>`);
   ligarSegTemas($("#plTema", el), temas);
+  $("#plOrg", el).addEventListener("change", ev => { $("#plOrgN", el).hidden = ev.target.value !== "grupos"; });
   el.querySelectorAll("[data-addparte]").forEach(b => b.addEventListener("click", () => $("#pl_" + b.dataset.addparte, el).insertAdjacentHTML("beforeend", linhaI({ parte: b.dataset.addparte }))));
   $("#plAddM", el)?.addEventListener("click", () => $("#plMat", el).insertAdjacentHTML("beforeend", linhaM({})));
   el.addEventListener("click", ev => { const b = ev.target.closest("[data-rm]"); if (b) b.closest("[data-item],[data-mat]").remove(); });
   ligarBlocos(el);
   $("#plOk", el).addEventListener("click", async () => {
     const nome = $("#plNome", el).value.trim(); if (!nome) return toast("Dê um nome ao plano");
+    const org = $("#plOrg", el).value, troca = +$("#plTroca", el).value || 0, trocaV = +$("#plTrocaV", el).value || 0;
     const dados = { nome, tema: temas[0], temas: temas.slice(), notas: $("#plNotas", el).value.trim(),
+      organizacao: org ? { tipo: org, ...(org === "grupos" ? { n: +$("#plOrgN", el).value || null } : {}) } : null,
+      troca: troca || trocaV ? { valor: troca || null, vezes: trocaV || null } : null,
       itens: lerItens(el),
       material: [...el.querySelectorAll("[data-mat]")].map(r => ({ materialId: r.querySelector(".mId").value, qtd: r.querySelector(".mQtd").value.trim() })).filter(m => m.materialId) };
     const pid = id || novoId("pl");
