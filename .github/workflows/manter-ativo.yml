@@ -1,0 +1,21 @@
+# Mantém o projeto Supabase da Escola de Movimento ativo (o plano gratuito pausa após 7 dias sem atividade).
+# Corre à terça e à sexta-feira e chama uma função só de leitura (e_admin, devolve false sem sessão).
+name: Manter Supabase ativo
+
+on:
+  schedule:
+    - cron: '23 8 * * 2,5'   # terça e sexta, 08:23 UTC
+  workflow_dispatch: {}       # permite correr à mão (separador Actions)
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar e_admin()
+        run: |
+          code=$(curl -sS -o resp.txt -w '%{http_code}' -X POST \
+            'https://xxodsmydruquhvalhthd.supabase.co/rest/v1/rpc/e_admin' \
+            -H 'apikey: sb_publishable_0QKEUFoRrW2b6ZccM-ctMw_ECzOq1Ov' \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "HTTP $code"; cat resp.txt; echo
+          test "$code" = "200"
