@@ -959,12 +959,12 @@ function formSessao(s) {
     <div class="field"><label for="fLocal">Local</label><input type="text" id="fLocal" value="${esc(f.local)}" list="locais"><datalist id="locais">${[...new Set(Object.values(S.equipas).map(x => x.local).concat(Object.values(S.sessoes).map(x => x.local)).filter(Boolean))].map(l => `<option>${esc(l)}</option>`).join("")}</datalist></div>
     <div class="field"><span class="lbl">A sessão foi realizada?</span><div class="seg" id="fEstado"><button data-v="dada">Sim, foi realizada</button><button data-v="nao_dada">Não foi realizada</button></div></div>
     <div id="blocoDada" class="field" style="gap:14px">
-      <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><output id="fN">${f.nAtletas}</output><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
+      <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><input type="number" id="fN" min="0" max="200" inputmode="numeric" value="${f.nAtletas}" aria-label="Número de atletas" style="width:90px;text-align:center;font-size:22px;font-weight:700"><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
       <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="fTema">${segTemas(f.temas)}</div></div>
       ${editorAval(f.avaliacao)}
       <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
-        <select id="fPlano" aria-label="Partir de um plano"><option value="">Carregar um plano…</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === f.planoId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
+        <select id="fPlano" aria-label="Plano da sessão"><option value="">Sem plano (ex.: só avaliação)</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === f.planoId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
       <div id="fItens">${editorItens(f.itens, f.temas)}</div>
       <div class="field"><label for="fResumo">Resumo (visível para treinadores e pais)</label><textarea rows="1" id="fResumo" placeholder="Ex.: Boa adesão, rever receção dos saltos">${esc(f.resumo)}</textarea></div>
     </div>
@@ -982,7 +982,8 @@ function formSessao(s) {
   const vis = () => { $("#blocoDada", el).hidden = f.estado !== "dada"; $("#blocoNao", el).hidden = f.estado === "dada"; };
   ligarEditorItens(el, () => f.temas);
   $("#fPlano", el).addEventListener("change", ev => {
-    const pl = S.planos[ev.target.value]; f.planoId = pl ? ev.target.value : null; if (!pl) return;
+    const pl = S.planos[ev.target.value]; f.planoId = pl ? ev.target.value : null;
+    if (!pl) { $("#fItens", el).innerHTML = editorItens([], f.temas); return toast("Plano retirado desta sessão. Se fez alguns exercícios, junte-os em baixo."); }
     if (temasDe(pl).length) { f.temas.splice(0, f.temas.length, ...temasDe(pl)); $("#fTema", el).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(f.temas.includes(b.dataset.v)))); }
     $("#fItens", el).innerHTML = editorItens(pl.itens, f.temas); toast("Exercícios do plano carregados");
   });
@@ -996,7 +997,9 @@ function formSessao(s) {
   $("#fData", el).addEventListener("change", () => $("#fEq", el).dispatchEvent(new Event("change")));
   seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); ligarSegTemas($("#fTema", el), f.temas); seg("#fMotivo", "motivo"); vis();
   $("#fMotivo", el).addEventListener("click", () => setTimeout(() => { const t = $("#fMotivoTxt", el); t.hidden = f.motivo !== "Outro"; if (!t.hidden) { crescer(t); t.focus(); } }, 0));
-  el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, f.nAtletas + +b.dataset.step); $("#fN", el).textContent = f.nAtletas; }));
+  el.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", () => { f.nAtletas = Math.max(0, (+f.nAtletas || 0) + +b.dataset.step); $("#fN", el).value = f.nAtletas; }));
+  $("#fN", el).addEventListener("input", ev => { f.nAtletas = Math.max(0, Math.round(+ev.target.value || 0)); });
+  $("#fN", el).addEventListener("focus", ev => ev.target.select());
 
   $("#fOk", el).addEventListener("click", async () => {
     const detalhe = $("#fMotivoTxt", el).value.trim();
@@ -1137,7 +1140,7 @@ function sessaoDoTema(equipaId, data) {
   let fila = [];
   if (tema) Object.keys(S.plano).filter(x => /^\d{4}-\d{2}$/.test(x) && x >= ini && x < k && temaDoMes(x) === tema).sort().forEach(x => {
     (S.plano[x].sessoes || []).forEach((id, i) => fila.push({ id, mes: x, n: i + 1 }));
-    const feitas = Object.values(S.sessoes).filter(z => z.equipaId === equipaId && z.data.startsWith(x) && z.estado === "dada").length;
+    const feitas = Object.values(S.sessoes).filter(z => z.equipaId === equipaId && z.data.startsWith(x) && z.estado === "dada" && !sessaoSoAval(equipaId, z.data)).length;
     fila = fila.slice(feitas);
   });
   const atrasadas = fila.length;
