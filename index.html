@@ -1344,6 +1344,155 @@ function avalId(eq = avalSel.equipaId, t = avalSel.teste, m = avalSel.momento, e
   return f ? f[0] : `${eq}_${t}_${ep.replace("/", "-")}_m${m}`;
 }
 function mesAnterior(k) { const [y, m] = k.split("-").map(Number); return mesKey(new Date(y, m - 2, 1)); }
+// Relatório de avaliações por modalidade (para enviar a coordenadores e treinadores): compara momento com momento em cada teste
+function formExportAval() {
+  const mods = [...new Set(Object.values(EQ()).map(e => e.modalidade).filter(Boolean))].sort();
+  const temAval = m => Object.values(S.avaliacoes).some(a => EQ()[a.equipaId]?.modalidade === m && epocaDe(a.data || a.mes + "-01") === epocaVista());
+  const el = abrirFolha(`<h2>Exportar avaliações</h2><span class="m">Relatório de uma modalidade, para enviar ao coordenador e aos treinadores. Mostra cada teste e compara o 1.º com o 2.º momento. Vai crescendo à medida que se fazem novas avaliações.</span>
+    <div class="field"><label for="xaMod">Modalidade</label><select id="xaMod">${mods.map(m => `<option ${temAval(m) ? "" : "disabled"}>${esc(m)}${temAval(m) ? "" : " (sem avaliações)"}</option>`).join("")}</select></div>
+    <span class="m">Leva as médias de cada escalão e o nome e as notas de cada atleta. No PDF, escolha "Guardar como PDF" na janela de impressão.</span>
+    <div class="actions"><button class="btn" data-close>Cancelar</button><button class="btn" id="xaXls">Excel</button><button class="btn primary" id="xaPdf">PDF</button></div>`);
+  const s0 = $("#xaMod", el); if (s0.selectedOptions[0]?.disabled) { const o = [...s0.options].find(x => !x.disabled); if (o) s0.value = o.value; }
+  const ok = () => { const m = s0.value; if (!temAval(m)) { toast("Esta modalidade ainda não tem avaliações"); return null; } fecharFolha(); return m; };
+  $("#xaXls", el).addEventListener("click", () => { const m = ok(); if (m) exportarAvaliacoes(m, true); });
+  $("#xaPdf", el).addEventListener("click", () => { const m = ok(); if (m) pdfAvaliacoes(m); });
+}
+async function exportarAvaliacoes(mod, nomes) {
+  toast("A preparar o ficheiro…");
+  try { await carregarExcelJS(); } catch (e) { return toast(e.message); }
+  const ep = epocaVista(), VERDE = "FF1F6B4A", VERDE_CL = "FFE2EFE7", VERM = "FFB8432F", CINZA = "FF6B6B6B", BRANCO = "FFFFFFFF";
+  const fill = c => ({ type: "pattern", pattern: "solid", fgColor: { argb: c } });
+  const eqs = Object.entries(EQ()).filter(([, e]) => e.modalidade === mod).sort((a, b) => (a[1].escalao || "").localeCompare(b[1].escalao || ""));
+  const avs = Object.values(S.avaliacoes).filter(a => eqs.some(([id]) => id === a.equipaId) && epocaDe(a.data || a.mes + "-01") === ep);
+  const TS = testes(), tids = Object.keys(TS).filter(t => avs.some(a => (a.teste || a.tema) === t)).concat([...new Set(avs.map(a => a.teste || a.tema))].filter(t => !TS[t]));
+  const nomeT = t => TS[t]?.nome || nomeTema(t), maxT = t => (TS[t]?.niveis || Object.values(ESCALA)).length;
+  const av = (eid, t, m) => avs.find(a => a.equipaId === eid && (a.teste || a.tema) === t && momentoDe(a) === m);
+  const media = l => l.length ? Math.round(l.reduce((x, y) => x + y, 0) / l.length * 100) / 100 : null;
+  const dt = iso => iso ? new Date(iso + "T00:00:00Z") : null;
+  const wb = new ExcelJS.Workbook(); wb.creator = "Escola do Movimento"; wb.created = new Date();
+  const cab = (ws, r, c, l) => { l.forEach((h, i) => { const k = ws.getCell(r, c + i); k.value = h; k.fill = fill(VERDE); k.font = { bold: true, color: { argb: BRANCO } }; k.alignment = { vertical: "middle", horizontal: i ? "center" : "left", wrapText: true }; }); ws.getRow(r).height = 30; };
+  const linha = (ws, r, c, l, j) => l.forEach((v, i) => { const k = ws.getCell(r, c + i); k.value = v; if (j % 2) k.fill = fill("FFF4F7F5"); k.border = { bottom: { style: "hair", color: { argb: "FFD5DDD8" } } }; k.alignment = { vertical: "top", horizontal: i ? "center" : "left", wrapText: true }; });
+  const escala = (ws, ref, max) => ws.addConditionalFormatting({ ref, rules: [{ type: "colorScale", cfvo: [{ type: "num", value: 1 }, { type: "num", value: (1 + max) / 2 }, { type: "num", value: max }], color: [{ argb: "FFF4B6A8" }, { argb: "FFFFF1B8" }, { argb: "FF9FD6B4" }] }] });
+  const evolCor = (k, d) => { if (d == null) return; k.numFmt = "+0.00;-0.00;0"; k.font = { bold: true, color: { argb: d > 0 ? VERDE : d < 0 ? VERM : CINZA } }; };
+
+  // ---------- RESUMO ----------
+  const R = wb.addWorksheet("Resumo", { views: [{ showGridLines: false }], properties: { tabColor: { argb: VERDE } } });
+  [26, 12, 12, 12, 12, 13, 13, 13, 13].forEach((w, i) => R.getColumn(i + 1).width = w);
+  R.mergeCells("A1:I1"); Object.assign(R.getCell("A1"), { value: `Escola do Movimento · Avaliações de ${mod}` }); R.getCell("A1").font = { bold: true, size: 18, color: { argb: BRANCO } }; R.getCell("A1").fill = fill(VERDE); R.getCell("A1").alignment = { vertical: "middle", indent: 1 }; R.getRow(1).height = 34;
+  R.mergeCells("A2:I2"); R.getCell("A2").value = `Época ${ep} · exportado a ${new Date().toLocaleDateString("pt-PT")} · ${eqs.map(([, e]) => e.escalao).filter(Boolean).join(", ")}`; R.getCell("A2").font = { color: { argb: CINZA } };
+  let r = 4;
+  tids.forEach(t => {
+    const T = TS[t], mx = maxT(t);
+    R.mergeCells(r, 1, r, 9); const tc = R.getCell(r, 1); tc.value = `${nomeT(t)}${T?.exercicio ? " · " + T.exercicio : ""}`; tc.font = { bold: true, size: 14, color: { argb: VERDE } }; tc.border = { bottom: { style: "medium", color: { argb: VERDE } } }; R.getRow(r).height = 22; r++;
+    if (T?.niveis?.length) { T.niveis.forEach((n, i) => { R.mergeCells(r, 1, r, 9); const k = R.getCell(r, 1); k.value = `Nível ${i + 1}: ${n}`; k.font = { size: 9, color: { argb: CINZA } }; k.alignment = { wrapText: true }; R.getRow(r).height = n.length > 110 ? 24 : 13; r++; }); }
+    r++;
+    // por escalão e momento
+    const nivCab = Array.from({ length: mx }, (_, i) => `% nível ${i + 1}`);
+    cab(R, r, 1, ["Escalão", "Momento", "Data", "Avaliados", "Média (1 a " + mx + ")", ...nivCab]); const r0 = ++r; let j = 0;
+    eqs.forEach(([eid, e]) => MOMENTOS.forEach(m => { const a = av(eid, t, m); if (!a) return; const v = Object.entries(a.resultados || {}).filter(([aid, x]) => x && S.atletas[aid]).map(([, x]) => x);
+      linha(R, r, 1, [e.escalao || equipaNome(eid), m + ".º", dt(a.data || a.mes + "-01"), v.length, media(v), ...Array.from({ length: mx }, (_, i) => v.length ? v.filter(x => x === i + 1).length / v.length : 0)], j++);
+      R.getCell(r, 3).numFmt = "dd/mm/yyyy"; for (let i = 0; i < mx; i++) R.getCell(r, 6 + i).numFmt = "0%"; r++; }));
+    if (r > r0) escala(R, `E${r0}:E${r - 1}`, mx);
+    // evolução 1.º → 2.º (só atletas avaliados nos dois)
+    const ev = eqs.map(([eid, e]) => { const a1 = av(eid, t, 1)?.resultados || {}, a2 = av(eid, t, 2)?.resultados || {}; const ids = Object.keys(a1).filter(id => a1[id] && a2[id] && S.atletas[id]); if (!ids.length) return null;
+      const m1 = media(ids.map(id => a1[id])), m2 = media(ids.map(id => a2[id])); return [e.escalao || equipaNome(eid), ids.length, m1, m2, Math.round((m2 - m1) * 100) / 100, ids.filter(id => a2[id] > a1[id]).length / ids.length, ids.filter(id => a2[id] === a1[id]).length / ids.length, ids.filter(id => a2[id] < a1[id]).length / ids.length]; }).filter(Boolean);
+    r++;
+    if (ev.length) { cab(R, r, 1, ["Evolução 1.º → 2.º", "Atletas", "Média 1.º", "Média 2.º", "Diferença", "Melhoraram", "Iguais", "Pioraram"]); r++;
+      ev.forEach((l, i) => { linha(R, r, 1, l, i); evolCor(R.getCell(r, 5), l[4]); [6, 7, 8].forEach(c => R.getCell(r, c).numFmt = "0%"); R.getCell(r, 6).font = { bold: true, color: { argb: VERDE } }; r++; }); }
+    else { const k = R.getCell(r, 1); k.value = "Evolução: aparece quando houver 2.º momento."; k.font = { italic: true, color: { argb: CINZA } }; r++; }
+    r += 2;
+  });
+  R.mergeCells(r, 1, r, 9); R.getCell(r, 1).value = "A média vai de 1 (nível mais baixo) ao nível máximo de cada teste. A evolução compara só os atletas avaliados nos dois momentos."; R.getCell(r, 1).font = { italic: true, size: 9, color: { argb: CINZA } }; R.getCell(r, 1).alignment = { wrapText: true }; R.getRow(r).height = 26;
+
+  // ---------- ATLETAS (opcional) ----------
+  if (nomes) {
+    const A = wb.addWorksheet("Atletas", { views: [{ state: "frozen", ySplit: 2, xSplit: 2 }] });
+    const cols = tids.flatMap(t => [[t, 1], [t, 2], [t, "ev"]]);
+    A.getColumn(1).width = 28; A.getColumn(2).width = 16; cols.forEach((x, i) => A.getColumn(3 + i).width = x[1] === "ev" ? 10 : 11);
+    // linha 1: nome do teste por cima dos 3 campos
+    tids.forEach((t, i) => { const c = 3 + i * 3; A.mergeCells(1, c, 1, c + 2); const k = A.getCell(1, c); k.value = nomeT(t) + " (1 a " + maxT(t) + ")"; k.fill = fill(VERDE); k.font = { bold: true, color: { argb: BRANCO } }; k.alignment = { horizontal: "center" }; });
+    ["", ""].forEach((v, i) => { A.getCell(1, i + 1).fill = fill(VERDE); });
+    cab(A, 2, 1, ["Atleta", "Escalão", ...cols.map(x => x[1] === "ev" ? "Evolução" : x[1] + ".º momento")]);
+    const ats = Object.entries(S.atletas).filter(([, a]) => eqs.some(([id]) => id === a.equipaId)).sort((x, y) => (S.equipas[x[1].equipaId]?.escalao || "").localeCompare(S.equipas[y[1].equipaId]?.escalao || "") || x[1].nome.localeCompare(y[1].nome));
+    let rr = 3;
+    ats.forEach(([aid, at], j) => { const vals = cols.map(([t, m]) => { if (m === "ev") { const a = av(at.equipaId, t, 1)?.resultados?.[aid], b = av(at.equipaId, t, 2)?.resultados?.[aid]; return a && b ? b - a : null; } return av(at.equipaId, t, m)?.resultados?.[aid] || null; });
+      linha(A, rr, 1, [at.nome, S.equipas[at.equipaId]?.escalao || "", ...vals], j);
+      cols.forEach(([, m], i) => { if (m === "ev") { const d = vals[i]; const k = A.getCell(rr, 3 + i); if (d != null) { k.numFmt = "+0;-0;0"; k.font = { bold: true, color: { argb: d > 0 ? VERDE : d < 0 ? VERM : CINZA } }; } } });
+      rr++; });
+    tids.forEach((t, i) => { const c = 3 + i * 3; [c, c + 1].forEach(cc => escala(A, `${A.getColumn(cc).letter}3:${A.getColumn(cc).letter}${Math.max(3, rr - 1)}`, maxT(t))); });
+    A.autoFilter = { from: { row: 2, column: 1 }, to: { row: Math.max(2, rr - 1), column: 2 + cols.length } };
+    A.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "1:2" };
+  }
+  R.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  const buf = await wb.xlsx.writeBuffer(), nome = `Avaliações ${mod} ${ep.replace("/", "-")}${nomes ? "" : " (médias)"}.xlsx`;
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a"); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Ficheiro exportado: " + nome);
+}
+// Relatório de avaliações em PDF (folha A4 pronta a imprimir ou guardar como PDF)
+function htmlRelAval(mod) {
+  const ep = epocaVista(), TS = testes();
+  const eqs = Object.entries(EQ()).filter(([, e]) => e.modalidade === mod).sort((a, b) => (a[1].escalao || "").localeCompare(b[1].escalao || ""));
+  const avs = Object.values(S.avaliacoes).filter(a => eqs.some(([id]) => id === a.equipaId) && epocaDe(a.data || a.mes + "-01") === ep);
+  const tids = Object.keys(TS).filter(t => avs.some(a => (a.teste || a.tema) === t)).concat([...new Set(avs.map(a => a.teste || a.tema))].filter(t => !TS[t]));
+  const nomeT = t => TS[t]?.nome || nomeTema(t), nivT = t => TS[t]?.niveis || Object.values(ESCALA);
+  const av = (eid, t, m) => avs.find(a => a.equipaId === eid && (a.teste || a.tema) === t && momentoDe(a) === m);
+  const vals = a => Object.entries(a?.resultados || {}).filter(([id, x]) => x && S.atletas[id]).map(([, x]) => x);
+  const med = l => l.length ? l.reduce((x, y) => x + y, 0) / l.length : null, n2 = x => x == null ? "—" : x.toFixed(2).replace(".", ","), pc = x => Math.round(x * 100) + "%";
+  const cor = (v, mx) => v == null ? "" : v === mx ? "#cdebd8" : v === 1 ? "#f8d3cb" : "#fdf0c4";
+  const barra = (l, mx) => { const n = l.length || 1; return `<div class="bar">${Array.from({ length: mx }, (_, i) => { const p = l.filter(x => x === i + 1).length / n; return p ? `<span style="width:${p * 100}%;background:${["#e4796a", "#f0c24b", "#5fb37f", "#2f8a57"][mx === 2 ? (i ? 2 : 0) : mx === 3 ? [0, 1, 2][i] : i]}">${p >= 0.12 ? pc(p) : ""}</span>` : ""; }).join("")}</div>`; };
+  let corpo = "";
+  tids.forEach(t => {
+    const mx = nivT(t).length;
+    corpo += `<section class="teste"><h2>${esc(nomeT(t))}${TS[t]?.exercicio ? ` <small>· ${esc(TS[t].exercicio)}</small>` : ""}</h2>
+      <div class="leg">${nivT(t).map((n, i) => `<span><i style="background:${["#e4796a", "#f0c24b", "#5fb37f", "#2f8a57"][mx === 2 ? (i ? 2 : 0) : mx === 3 ? i : i]}"></i><b>Nível ${i + 1}</b> ${esc(n)}</span>`).join("")}</div>
+      <table class="res"><thead><tr><th>Escalão</th><th>Momento</th><th>Data</th><th>Avaliados</th><th>Média (1 a ${mx})</th><th style="width:38%">Distribuição por nível</th></tr></thead><tbody>`;
+    eqs.forEach(([eid, e]) => MOMENTOS.forEach(m => { const a = av(eid, t, m); if (!a) return; const v = vals(a);
+      corpo += `<tr><td>${esc(e.escalao || equipaNome(eid))}</td><td class="c">${m}.º</td><td class="c">${dataCurta(a.data || a.mes + "-01").slice(4)}</td><td class="c">${v.length}</td><td class="c"><b>${n2(med(v))}</b></td><td>${barra(v, mx)}</td></tr>`; }));
+    corpo += `</tbody></table>`;
+    const ev = eqs.map(([eid, e]) => { const a1 = av(eid, t, 1)?.resultados || {}, a2 = av(eid, t, 2)?.resultados || {}; const ids = Object.keys(a1).filter(id => a1[id] && a2[id] && S.atletas[id]); if (!ids.length) return null;
+      const m1 = med(ids.map(id => a1[id])), m2 = med(ids.map(id => a2[id])), mel = ids.filter(id => a2[id] > a1[id]).length, pio = ids.filter(id => a2[id] < a1[id]).length;
+      return `<div class="ev"><b>${esc(e.escalao || equipaNome(eid))}</b><span>${ids.length} atletas nos dois momentos</span><span class="big">${n2(m1)} → ${n2(m2)} <em class="${m2 > m1 ? "up" : m2 < m1 ? "down" : ""}">${m2 - m1 > 0 ? "+" : ""}${n2(m2 - m1)}</em></span><span><b class="up">${mel}</b> melhoraram · ${ids.length - mel - pio} iguais · <b class="down">${pio}</b> pioraram</span></div>`; }).filter(Boolean);
+    corpo += ev.length ? `<h3>Evolução do 1.º para o 2.º momento</h3><div class="evs">${ev.join("")}</div>` : `<p class="nota">A evolução aparece quando houver avaliação do 2.º momento.</p>`;
+    corpo += `</section>`;
+  });
+  // atletas: uma tabela por escalão, com 1.º e 2.º momento de cada teste
+  eqs.forEach(([eid, e]) => {
+    const ats = Object.entries(S.atletas).filter(([, a]) => a.equipaId === eid).sort((x, y) => x[1].nome.localeCompare(y[1].nome));
+    const ts = tids.filter(t => av(eid, t, 1) || av(eid, t, 2)); if (!ats.length || !ts.length) return;
+    corpo += `<section class="atl"><h2>${esc(mod)} ${esc(e.escalao || "")} <small>· resultados por atleta</small></h2><table class="at"><thead><tr><th rowspan="2">Atleta</th>${ts.map(t => `<th colspan="3">${esc(nomeT(t))} <small>(1 a ${nivT(t).length})</small></th>`).join("")}</tr><tr>${ts.map(() => `<th>1.º</th><th>2.º</th><th>Evol.</th>`).join("")}</tr></thead><tbody>
+      ${ats.map(([aid, at]) => `<tr><td>${esc(at.nome)}</td>${ts.map(t => { const mx = nivT(t).length, a = av(eid, t, 1)?.resultados?.[aid] || null, b = av(eid, t, 2)?.resultados?.[aid] || null, d = a && b ? b - a : null;
+        return `<td class="c" style="background:${cor(a, mx)}">${a || ""}</td><td class="c" style="background:${cor(b, mx)}">${b || ""}</td><td class="c ${d > 0 ? "up" : d < 0 ? "down" : ""}"><b>${d == null ? "" : d > 0 ? "▲ +" + d : d < 0 ? "▼ " + d : "="}</b></td>`; }).join("")}</tr>`).join("")}</tbody></table></section>`;
+  });
+  return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Avaliações ${esc(mod)} ${ep}</title><style>
+    @page { size: A4; margin: 14mm 12mm }
+    * { box-sizing: border-box } body { font: 11px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1d2b24; margin: 0 }
+    header { background: #1f6b4a; color: #fff; padding: 14px 18px; border-radius: 10px; display: flex; justify-content: space-between; align-items: flex-end }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: .3px } header p { margin: 2px 0 0; opacity: .85 } header .ep { text-align: right; font-size: 12px }
+    h2 { color: #1f6b4a; font-size: 16px; margin: 18px 0 6px; border-bottom: 2px solid #1f6b4a; padding-bottom: 3px } h2 small { color: #6b6b6b; font-weight: 400; font-size: 12px }
+    h3 { font-size: 12px; margin: 12px 0 6px; color: #1d2b24 }
+    .leg { display: grid; gap: 3px; margin: 6px 0 10px; color: #444; font-size: 10px } .leg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px }
+    table { width: 100%; border-collapse: collapse } th { background: #1f6b4a; color: #fff; font-weight: 600; padding: 5px 6px; text-align: left; font-size: 10px } td { padding: 4px 6px; border-bottom: 1px solid #e3e9e5 } tbody tr:nth-child(even) td { background-color: #f6f8f7 }
+    .c { text-align: center } th small { font-weight: 400; opacity: .85 }
+    .bar { display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: #eee } .bar span { color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center }
+    .evs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px } .ev { border: 1.5px solid #1f6b4a; border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px } .ev .big { font-size: 16px; font-weight: 700 }
+    .up { color: #1f6b4a } .down { color: #b8432f } em { font-style: normal }
+    .nota { color: #6b6b6b; font-style: italic } .teste { break-inside: avoid } .atl { break-before: page } .at td { font-size: 10.5px } .at th { text-align: center } .at th:first-child { text-align: left }
+    footer { margin-top: 16px; color: #6b6b6b; font-size: 9px }
+    @media screen { body { max-width: 820px; margin: 16px auto; padding: 0 12px } }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact }
+  </style></head><body>
+  <header><div><h1>Avaliações · ${esc(mod)}</h1><p>Escola do Movimento · ${eqs.map(([, e]) => esc(e.escalao)).filter(Boolean).join(", ")}</p></div><div class="ep">Época ${ep}<br>${new Date().toLocaleDateString("pt-PT")}</div></header>
+  ${corpo || `<p class="nota">Ainda não há avaliações desta modalidade.</p>`}
+  <footer>A média vai de 1 (nível mais baixo) ao nível máximo de cada teste. A evolução compara só os atletas avaliados nos dois momentos. Documento interno: contém nomes de atletas.</footer>
+  </body></html>`;
+}
+function pdfAvaliacoes(mod) {
+  const html = htmlRelAval(mod), w = window.open("", "_blank");
+  if (!w) return toast("O navegador bloqueou a janela. Permita janelas para esta app.");
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 400);
+}
 function viewAvaliacoes() {
   if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}</section>${viewMetricas()}${viewEvolucao()}`;
   const equipas = sorted(EQ(), (a, b) => a.modalidade.localeCompare(b.modalidade)), TS = testes();
@@ -1359,7 +1508,7 @@ function viewAvaliacoes() {
   // Só se avalia um tema depois de pelo menos 2 sessões realizadas desse tema (regra do João)
   const nTema = id => Object.values(S.sessoes).filter(x => x.equipaId === id && x.estado === "dada" && temasDe(x).includes(T.tema)).length;
   const prontas = equipas.map(e => ({ e, n: nTema(e.id) }));
-  let html = `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
+  let html = (podeGerir() && Object.keys(S.avaliacoes).length ? `<section><button class="btn" data-act="exportAval" style="width:100%">⬇ Exportar avaliações por modalidade (PDF ou Excel)</button></section>` : "") + `<section><div class="sec-h"><h2>Avaliação</h2><span class="sub">${feitos}/${atletas.length} avaliados</span></div>
     <div class="field"><span class="lbl">Teste</span><div class="seg" id="aTeste">${Object.entries(TS).map(([id, t]) => `<button data-v="${id}" aria-pressed="${id === avalSel.teste}">${esc(t.nome)}</button>`).join("")}</div>${T.exercicio ? `<span class="t">${esc(T.exercicio)}</span>` : ""}
       ${podeGerir() ? `<div class="row" style="justify-content:flex-start"><button class="btn ghost" data-act="teste" data-id="${avalSel.teste}">Editar teste</button><button class="btn ghost" data-act="teste">Novo teste</button></div>` : ""}</div>
     <details class="item"><summary><b>Como se faz</b> <span class="m">· tema ${esc(nomeTema(T.tema))}</span></summary><p style="margin:8px 0 0;white-space:pre-line">${esc(T.protocolo || "")}</p></details>
@@ -2137,6 +2286,7 @@ $("#view").addEventListener("click", e => {
     novoMaterial: () => formMaterial(), editMaterial: () => formMaterial(id),
     verEquipa: () => verEquipa(id), atleta: () => formAtleta(id), moverAtletas: () => formMoverAtletas(),
     reuniao: () => formReuniao(id),
+    exportAval: () => formExportAval(),
     registarPrev: () => { const pv = previstas(a.dataset.data, a.dataset.data).find(x => x.equipaId === id) || {}; formSessao({ equipaId: id, data: a.dataset.data, hora: pv.hora, local: pv.local, duracao: pv.duracao }); },
     alterar: () => formAlteracao(id, a.dataset.data),
     registar: () => formSessao(id && S.equipas[id] ? { equipaId: id } : null),
