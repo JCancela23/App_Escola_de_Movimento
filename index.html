@@ -1437,6 +1437,7 @@ function htmlRelAval(mod) {
   const tids = Object.keys(TS).filter(t => avs.some(a => (a.teste || a.tema) === t)).concat([...new Set(avs.map(a => a.teste || a.tema))].filter(t => !TS[t]));
   const nomeT = t => TS[t]?.nome || nomeTema(t), nivT = t => TS[t]?.niveis || Object.values(ESCALA);
   const av = (eid, t, m) => avs.find(a => a.equipaId === eid && (a.teste || a.tema) === t && momentoDe(a) === m);
+  const dataPT = iso => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) : "";
   const vals = a => Object.entries(a?.resultados || {}).filter(([id, x]) => x && S.atletas[id]).map(([, x]) => x);
   const med = l => l.length ? l.reduce((x, y) => x + y, 0) / l.length : null, n2 = x => x == null ? "—" : x.toFixed(2).replace(".", ","), pc = x => Math.round(x * 100) + "%";
   const cor = (v, mx) => v == null ? "" : v === mx ? "#cdebd8" : v === 1 ? "#f8d3cb" : "#fdf0c4";
@@ -1448,7 +1449,7 @@ function htmlRelAval(mod) {
       <div class="leg">${nivT(t).map((n, i) => `<span><i style="background:${["#e4796a", "#f0c24b", "#5fb37f", "#2f8a57"][mx === 2 ? (i ? 2 : 0) : mx === 3 ? i : i]}"></i><b>Nível ${i + 1}</b> ${esc(n)}</span>`).join("")}</div>
       <table class="res"><thead><tr><th>Escalão</th><th>Momento</th><th>Data</th><th>Avaliados</th><th>Média (1 a ${mx})</th><th style="width:38%">Distribuição por nível</th></tr></thead><tbody>`;
     eqs.forEach(([eid, e]) => MOMENTOS.forEach(m => { const a = av(eid, t, m); if (!a) return; const v = vals(a);
-      corpo += `<tr><td>${esc(e.escalao || equipaNome(eid))}</td><td class="c">${m}.º</td><td class="c">${dataCurta(a.data || a.mes + "-01").slice(4)}</td><td class="c">${v.length}</td><td class="c"><b>${n2(med(v))}</b></td><td>${barra(v, mx)}</td></tr>`; }));
+      corpo += `<tr><td>${esc(e.escalao || equipaNome(eid))}</td><td class="c">${m}.º</td><td class="c">${dataPT(a.data || a.mes + "-01")}</td><td class="c">${v.length}</td><td class="c"><b>${n2(med(v))}</b></td><td>${barra(v, mx)}</td></tr>`; }));
     corpo += `</tbody></table>`;
     const ev = eqs.map(([eid, e]) => { const a1 = av(eid, t, 1)?.resultados || {}, a2 = av(eid, t, 2)?.resultados || {}; const ids = Object.keys(a1).filter(id => a1[id] && a2[id] && S.atletas[id]); if (!ids.length) return null;
       const m1 = med(ids.map(id => a1[id])), m2 = med(ids.map(id => a2[id])), mel = ids.filter(id => a2[id] > a1[id]).length, pio = ids.filter(id => a2[id] < a1[id]).length;
@@ -1460,15 +1461,18 @@ function htmlRelAval(mod) {
   eqs.forEach(([eid, e]) => {
     const ats = Object.entries(S.atletas).filter(([, a]) => a.equipaId === eid).sort((x, y) => x[1].nome.localeCompare(y[1].nome));
     const ts = tids.filter(t => av(eid, t, 1) || av(eid, t, 2)); if (!ats.length || !ts.length) return;
-    corpo += `<section class="atl"><h2>${esc(mod)} ${esc(e.escalao || "")} <small>· resultados por atleta</small></h2><table class="at"><thead><tr><th rowspan="2">Atleta</th>${ts.map(t => `<th colspan="3">${esc(nomeT(t))} <small>(1 a ${nivT(t).length})</small></th>`).join("")}</tr><tr>${ts.map(() => `<th>1.º</th><th>2.º</th><th>Evol.</th>`).join("")}</tr></thead><tbody>
+    corpo += `<section class="atl"><h2>${esc(mod)} ${esc(e.escalao || "")} <small>· resultados por atleta</small></h2><table class="at"><thead><tr><th rowspan="2">Atleta</th>${ts.map(t => `<th colspan="3">${esc(nomeT(t))} <small>(1 a ${nivT(t).length})</small></th>`).join("")}</tr><tr>${ts.map(t => [1, 2].map(m => { const a = av(eid, t, m); return `<th>${m}.º<br><small>${a ? dataPT(a.data || a.mes + "-01") : "por fazer"}</small></th>`; }).join("") + `<th>Evol.</th>`).join("")}</tr></thead><tbody>
       ${ats.map(([aid, at]) => `<tr><td>${esc(at.nome)}</td>${ts.map(t => { const mx = nivT(t).length, a = av(eid, t, 1)?.resultados?.[aid] || null, b = av(eid, t, 2)?.resultados?.[aid] || null, d = a && b ? b - a : null;
         return `<td class="c" style="background:${cor(a, mx)}">${a || ""}</td><td class="c" style="background:${cor(b, mx)}">${b || ""}</td><td class="c ${d > 0 ? "up" : d < 0 ? "down" : ""}"><b>${d == null ? "" : d > 0 ? "▲ +" + d : d < 0 ? "▼ " + d : "="}</b></td>`; }).join("")}</tr>`).join("")}</tbody></table></section>`;
   });
   return `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><title>Avaliações ${esc(mod)} ${ep}</title><style>
     @page { size: A4; margin: 14mm 12mm }
     * { box-sizing: border-box } body { font: 11px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1d2b24; margin: 0 }
-    header { background: #1f6b4a; color: #fff; padding: 14px 18px; border-radius: 10px; display: flex; justify-content: space-between; align-items: flex-end }
-    header h1 { margin: 0; font-size: 22px; letter-spacing: .3px } header p { margin: 2px 0 0; opacity: .85 } header .ep { text-align: right; font-size: 12px }
+    header { background: #1f6b4a; color: #fff; padding: 12px 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center }
+    .marca { display: flex; gap: 12px; align-items: center } .lg { width: 46px; height: 46px; border-radius: 10px; outline: 2px solid rgba(255,255,255,.35) }
+    .em { font-size: 22px; font-weight: 800; letter-spacing: .3px } .pc { font-size: 10px; opacity: .85; text-transform: uppercase; letter-spacing: 1.5px }
+    .clube { height: 52px; max-width: 140px; object-fit: contain; background: #fff; border-radius: 8px; padding: 4px }
+    .titulo { display: flex; justify-content: space-between; align-items: flex-end; margin: 12px 2px 0 } .titulo h1 { margin: 0; font-size: 18px; color: #1d2b24 } .titulo p { margin: 2px 0 0; color: #6b6b6b } .titulo .ep { text-align: right; color: #6b6b6b; font-size: 11px }
     h2 { color: #1f6b4a; font-size: 16px; margin: 18px 0 6px; border-bottom: 2px solid #1f6b4a; padding-bottom: 3px } h2 small { color: #6b6b6b; font-weight: 400; font-size: 12px }
     h3 { font-size: 12px; margin: 12px 0 6px; color: #1d2b24 }
     .leg { display: grid; gap: 3px; margin: 6px 0 10px; color: #444; font-size: 10px } .leg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px }
@@ -1482,7 +1486,8 @@ function htmlRelAval(mod) {
     @media screen { body { max-width: 820px; margin: 16px auto; padding: 0 12px } }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact }
   </style></head><body>
-  <header><div><h1>Avaliações · ${esc(mod)}</h1><p>Escola do Movimento · ${eqs.map(([, e]) => esc(e.escalao)).filter(Boolean).join(", ")}</p></div><div class="ep">Época ${ep}<br>${new Date().toLocaleDateString("pt-PT")}</div></header>
+  <header><div class="marca"><svg class="lg" viewBox="0 0 64 64" ><rect width="64" height="64" rx="14" fill="#1f6b4a"/><path d="M8 50 C 12 18, 52 18, 56 50" fill="none" stroke="#e3a93a" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 6"/><g stroke="#fff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M36 27 L31 37"/><path d="M31 36 L21 50 M31 36 L41 50"/><path d="M36 27 L25 13 M36 27 L50 17"/></g><circle cx="29.5" cy="43.5" r="4.6" fill="#fff"/><path d="M14 53 H50" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg><div><div class="em">Escola do Movimento</div><div class="pc">Projeto Code</div></div></div><img class="clube" src="${new URL("clube.png", location.href).href}" alt="" onerror="this.remove()"></header>
+  <div class="titulo"><div><h1>Relatório de avaliações · ${esc(mod)}</h1><p>${eqs.map(([, e]) => esc(e.escalao)).filter(Boolean).join(", ")}</p></div><div class="ep">Época ${ep}<br>Emitido a ${new Date().toLocaleDateString("pt-PT")}</div></div>
   ${corpo || `<p class="nota">Ainda não há avaliações desta modalidade.</p>`}
   <footer>A média vai de 1 (nível mais baixo) ao nível máximo de cada teste. A evolução compara só os atletas avaliados nos dois momentos. Documento interno: contém nomes de atletas.</footer>
   </body></html>`;
