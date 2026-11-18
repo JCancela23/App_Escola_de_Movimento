@@ -1496,7 +1496,9 @@ function pdfAvaliacoes(mod) {
   const html = htmlRelAval(mod), w = window.open("", "_blank");
   if (!w) return toast("O navegador bloqueou a janela. Permita janelas para esta app.");
   w.document.open(); w.document.write(html); w.document.close();
-  setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 400);
+  // espera pelo logótipo do clube antes de abrir a impressão
+  const imprimir = () => { try { w.focus(); w.print(); } catch (e) {} }, img = w.document.querySelector("img.clube");
+  if (img && !img.complete) { let feito = false; const f = () => { if (!feito) { feito = true; setTimeout(imprimir, 150); } }; img.addEventListener("load", f); img.addEventListener("error", f); setTimeout(f, 2500); } else setTimeout(imprimir, 400);
 }
 function viewAvaliacoes() {
   if (!podeEscrever()) return `<section><div class="sec-h"><h2>Avaliações</h2></div><span class="m">Resultado médio de cada equipa em cada teste. Os resultados individuais dos atletas não são públicos.</span>${Object.keys(S.avaliacoes).length ? "" : `<div class="empty">Ainda não há avaliações.</div>`}</section>${viewMetricas()}${viewEvolucao()}`;
