@@ -409,11 +409,16 @@ function sessaoSoAval(eid, d) {
   const pl = S.planeadas[eid + "_" + d]; return !!pl?.avaliacao?.length && !pl.planoId;
 }
 function editorAval(lista) {
-  return `<div class="field"><span class="lbl">Avaliação nesta sessão</span>${Object.entries(testes()).map(([id, t]) => { const x = (lista || []).find(y => y.teste === id);
-    return `<div class="row avrow" data-avt="${id}" style="justify-content:flex-start;gap:10px"><label class="junto" style="flex:1"><input type="checkbox" class="avOn" ${x ? "checked" : ""}> ${esc(t.nome)}</label><select class="avMom" aria-label="Momento da avaliação de ${esc(t.nome)}">${MOMENTOS.map(m => `<option value="${m}" ${momentoDe(x || {}) === m ? "selected" : ""}>${m}.º momento</option>`).join("")}</select></div>`; }).join("")}
-    <span class="m">Se houver tempo, pode juntar na mesma sessão um plano ou exercícios do tema novo.</span></div>`;
+  const tem = !!(lista || []).length;
+  return `<div class="field avbox"><span class="lbl">Houve avaliação nesta sessão?</span><div class="seg avSim"><button type="button" data-v="0" aria-pressed="${!tem}">Não</button><button type="button" data-v="1" aria-pressed="${tem}">Sim</button></div>
+    <div class="avLista" ${tem ? "" : "hidden"}>${Object.entries(testes()).map(([id, t]) => { const x = (lista || []).find(y => y.teste === id);
+    return `<div class="row avrow" data-avt="${id}" style="justify-content:flex-start;gap:10px"><label class="junto" style="flex:1"><input type="checkbox" class="avOn" ${x ? "checked" : ""}> Avaliação de ${esc(t.nome)}</label><select class="avMom" aria-label="Momento da avaliação de ${esc(t.nome)}">${MOMENTOS.map(m => `<option value="${m}" ${momentoDe(x || {}) === m ? "selected" : ""}>${m}.º momento</option>`).join("")}</select></div>`; }).join("")}
+    <span class="m">Marque o teste feito. Se houver tempo, pode juntar na mesma sessão um plano ou exercícios.</span></div></div>`;
 }
-const lerAval = el => [...el.querySelectorAll("[data-avt]")].filter(r => r.querySelector(".avOn").checked).map(r => ({ teste: r.dataset.avt, momento: +r.querySelector(".avMom").value }));
+document.addEventListener("click", e => { const b = e.target.closest(".avSim button"); if (!b) return; const box = b.closest(".avbox"), sim = b.dataset.v === "1";
+  box.querySelectorAll(".avSim button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); box.querySelector(".avLista").hidden = !sim;
+  if (!sim) box.querySelector(".avOn")?.dispatchEvent(new Event("change", { bubbles: true })); });
+const lerAval = el => [...el.querySelectorAll("[data-avt]")].filter(r => r.closest(".avbox")?.querySelector('.avSim [data-v="1"]')?.getAttribute("aria-pressed") === "true").filter(r => r.querySelector(".avOn").checked).map(r => ({ teste: r.dataset.avt, momento: +r.querySelector(".avMom").value }));
 function linhaPlano(eid, data) { const av = avalDaSessao(eid, data).map(x => `<span class="plnome aval">${esc(rotuloAval(x))}</span>`).join(""); const reg = Object.values(S.sessoes).find(x => x.equipaId === eid && x.data === data && x.estado === "dada"), rid = reg && planoRegistadoId(reg); const pl = rid ? S.planos[rid] : reg ? null : planoDaSessao(eid, data); return av + (pl ? `<span class="plnome">📋 ${esc(pl.nome)}</span>` : ""); }
 function itemPrevista(p) {
   const e = S.equipas[p.equipaId], s = sessaoDe(p);
@@ -962,7 +967,7 @@ function formSessao(s) {
       <div class="field"><span class="lbl">Número de atletas</span><div class="stepper"><button type="button" data-step="-1" aria-label="Menos um">−</button><input type="number" id="fN" min="0" max="200" inputmode="numeric" value="${f.nAtletas}" aria-label="Número de atletas" style="width:90px;text-align:center;font-size:22px;font-weight:700"><button type="button" data-step="1" aria-label="Mais um">+</button></div></div>
       <div class="field"><span class="lbl">Como correu</span><div class="seg" id="fCorreu">${CORREU.map(c => `<button data-v="${c.v}">${c.t}</button>`).join("")}</div></div>
       <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="fTema">${segTemas(f.temas)}</div></div>
-      ${editorAval(f.avaliacao)}
+      <div id="fAval">${editorAval(f.avaliacao)}</div>
       <div class="field"><span class="lbl">Exercícios da sessão</span><span class="m">${plS ? "Vêm do plano: " + esc(plS.nome) + ". Ajuste ao que foi feito." : "Construa a sessão com exercícios da base de dados, ou parta de um plano."}</span>
         <select id="fPlano" aria-label="Plano da sessão"><option value="">Sem plano (ex.: só avaliação)</option>${sorted(S.planos, (a, b) => a.nome.localeCompare(b.nome)).map(x => `<option value="${x.id}" ${x.id === f.planoId ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></div>
       <div id="fItens">${editorItens(f.itens, f.temas)}</div>
@@ -992,7 +997,11 @@ function formSessao(s) {
   $("#fEq", el).addEventListener("change", ev => {
     const q = S.equipas[ev.target.value] || {};
     if (!s?.dadaPor) fPor.value = q.responsavel || "";
-    if (!s?.id && q.modalidade) { const h = horarioNoDia(q, $("#fData", el).value || hoje); $("#fHora", el).value = h.hora || ""; $("#fLocal", el).value = h.local || ""; $("#fDur", el).value = h.duracao || 20; }
+    if (!s?.id && q.modalidade) { const dt = $("#fData", el).value || hoje, h = horarioNoDia(q, dt); $("#fHora", el).value = h.hora || ""; $("#fLocal", el).value = h.local || ""; $("#fDur", el).value = h.duracao || 20;
+      // plano e avaliação passam a ser os desta equipa e deste dia
+      const pl = planoDaSessao(ev.target.value, dt); f.planoId = pl?.id || null; $("#fPlano", el).value = f.planoId || "";
+      $("#fItens", el).innerHTML = editorItens(pl ? JSON.parse(JSON.stringify(pl.itens || [])) : [], f.temas);
+      $("#fAval", el).innerHTML = editorAval(S.planeadas[ev.target.value + "_" + dt]?.avaliacao || []); }
   });
   $("#fData", el).addEventListener("change", () => $("#fEq", el).dispatchEvent(new Event("change")));
   seg("#fEstado", "estado"); seg("#fCorreu", "correu", Number); ligarSegTemas($("#fTema", el), f.temas); seg("#fMotivo", "motivo"); vis();
