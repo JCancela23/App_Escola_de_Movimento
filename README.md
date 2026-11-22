@@ -1,6 +1,6 @@
-# Escola do Movimento
+# Escola de Movimento
 
-App web (para telemóvel) para planear e registar as sessões da Escola do Movimento: horário semanal e alterações, registo rápido das sessões, exercícios com vídeo, avaliações (gatinhar e saltar), pessoas e contactos, e relatórios semanais e mensais.
+App web (para telemóvel) para planear e registar as sessões da Escola de Movimento: horário semanal e alterações, registo rápido das sessões, exercícios com vídeo, avaliações (gatinhar e saltar), pessoas e contactos, e relatórios semanais e mensais.
 
 - **Site:** página estática (`index.html`), publicada no GitHub Pages.
 - **Dados e login:** Supabase. As regras de acesso estão em `supabase/schema.sql`.

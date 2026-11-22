@@ -149,7 +149,7 @@ window.EM_SIMULACAO = function (S) {
 
   // ---------- reuniões com tarefas ----------
   const R = (id, data, hora, tipo, local, objetivos, tarefas) => S.reunioes[id] = { data, hora, tipo, local, participantes: ["joao-cancela", "bruna"], objetivos, notas: "", tarefas: tarefas.map(([texto, responsavel, prazo, feito]) => ({ texto, responsavel, prazo, feito })) };
-  R("r1", ano + "-09-10", "21:00", "online", "Teams", "Arranque da Escola do Movimento: horários e temas", [["Enviar horário aos treinadores", "joao-cancela", ano + "-09-12", true], ["Inventário do material", "bruna", ano + "-09-14", true]]);
+  R("r1", ano + "-09-10", "21:00", "online", "Teams", "Arranque da Escola de Movimento: horários e temas", [["Enviar horário aos treinadores", "joao-cancela", ano + "-09-12", true], ["Inventário do material", "bruna", ano + "-09-14", true]]);
   R("r2", ano + "-10-01", "18:00", "presencial", "Pavilhão principal", "Balanço do mês de saltar e preparar gatinhar", [["Gravar vídeos dos exercícios de gatinhar", "bruna", ano + "-10-05", true], ["Avaliação de saltar em todas as equipas", "bruna", ano + "-10-10", true]]);
   R("r3", ano + "-11-03", "21:00", "online", "Teams", "Resolver conflitos de espaço no basquetebol", [["Falar com o coordenador de basquetebol", "joao-cancela", ano + "-11-08", true]]);
   R("r4", ano + "-12-02", "18:30", "presencial", "Sede do clube", "Preparar relatório do 1.º período para a direção", [["Relatório do 1.º período", "joao-cancela", ano + "-12-15", true], ["Comprar 10 elásticos novos", "joao-cancela", ano + "-12-20", false]]);
