@@ -576,10 +576,11 @@ function calcRelatorio() {
   const deReun = relPeriodo === "epoca" ? anoEpoca(epocaVista()) + "-08-01" : P.de;
   const reun = Object.values(S.reunioes).filter(r => r.data >= deReun && r.data <= P.ate).sort((a, b) => a.data.localeCompare(b.data));
   const tarefas = reun.flatMap(r => r.tarefas || []);
+  const acont = eventos().filter(e => e.data >= deReun && e.data <= P.ate);
   const aval = {}; Object.values(S.avaliacoes).filter(a => a.mes >= P.de.slice(0, 7) && a.mes <= P.ate.slice(0, 7)).forEach(a => {
     const v = Object.values(a.resultados || {}).filter(Boolean); if (!v.length) return;
     const t = testeDe(a).nome; const x = aval[t] = aval[t] || { soma: 0, n: 0, max: maxDe(a) }; x.soma += v.reduce((p, q) => p + q, 0); x.n += v.length; });
-  return { P, linhas, dadas, nao, porReg, ferias, atletas, porMod, porPessoa, motivos, temas, modalidadesAbr, escaloes, reun, tarefas, aval };
+  return { P, linhas, dadas, nao, porReg, ferias, atletas, porMod, porPessoa, motivos, temas, modalidadesAbr, escaloes, reun, tarefas, aval, acont };
 }
 function barras(obj, cor, total) {
   return Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
@@ -650,6 +651,13 @@ async function construirExcel() {
     b.value = nome.toUpperCase(); b.font = { size: 9, bold: true, color: { argb: CINZA } }; b.alignment = { horizontal: "center" }; b.fill = fill("FFF6F8F7");
     P.getRow(r).height = 36; });
   let r = 11;
+  // acontecimentos da época (formações, reuniões gerais), em destaque
+  const acEp = eventos().filter(e => naEpoca(e.data));
+  if (acEp.length) { r = titulo(P, r, "Acontecimentos da época");
+    acEp.forEach(e => { P.mergeCells(r, 1, r, 6); const c = P.getCell(r, 1);
+      c.value = `${dataCurta(e.data)}${e.inicio ? " · " + horaStd(e.inicio) + (e.fim ? "–" + horaStd(e.fim) : "") : ""} · ${e.titulo}${e.local ? " · " + e.local : ""}${e.nota ? " — " + e.nota : ""}`;
+      c.fill = fill("FFFFF1B8"); c.font = { bold: true, color: { argb: "FF1D2B24" } }; c.alignment = { wrapText: true, vertical: "middle", indent: 1 }; P.getRow(r).height = c.value.length > 100 ? 34 : 22; r++; });
+    r += 1; }
   // por modalidade
   const porMod = {}; sess.forEach(([, x]) => { const k = equipaNome(x.equipaId), o = porMod[k] = porMod[k] || { s: 0, n: 0, p: 0 }; if (x.estado === "dada") { o.s++; o.p += +x.nAtletas || 0; } else o.n++; });
   r = titulo(P, r, "Sessões por modalidade");
@@ -759,6 +767,9 @@ async function construirExcel() {
   larguras(WTa, [13, 60, 18, 11, 11]); datas(WTa, [1, 4]);
   tabela(WTa, 1, 1, ["Reunião de", "Tarefa", "Responsável", "Prazo", "Estado"], lta, { vazio: "Sem tarefas." });
   marca(WTa, 5, lta.length, { "Por fazer": ["FFFFF1B8", AMAR], "Feita": [VERDE_CL, VERDE] });
+  const WAg = wb.addWorksheet("Agenda", { views: [{ state: "frozen", ySplit: 1 }] });
+  larguras(WAg, [11, 7, 7, 30, 28, 50]); datas(WAg, [1]);
+  tabela(WAg, 1, 1, ["Data", "Início", "Fim", "Acontecimento", "Local", "Nota"], eventos().filter(e => naEpoca(e.data)).map(e => [dt(e.data), horaStd(e.inicio) || "", horaStd(e.fim) || "", e.titulo || "", e.local || "", e.nota || ""]), { vazio: "Sem acontecimentos." });
   // ---------- MATERIAL ----------
   const WM = wb.addWorksheet("Material", { views: [{ state: "frozen", ySplit: 1 }] });
   larguras(WM, [28, 11, 60, 16, 18]);
@@ -792,6 +803,7 @@ function viewRelatorio() {
   if (R.nao.length) html += `<section><div class="sec-h"><h2>Motivos</h2></div><div class="item">${barras(R.motivos, "var(--bad)", R.nao.length)}</div>
     <details class="item"><summary><b>Ver as ${R.nao.length} sessões não realizadas</b></summary>${R.nao.slice().sort((x, y) => x.data.localeCompare(y.data)).map(l => `<div class="row" style="align-items:flex-start"><span>${dataCurta(l.data)} · ${esc(equipaNome(l.equipaId))}</span><span class="m" style="text-align:right">${esc(motivoTxt(l) || "Outro")}</span></div>`).join("")}</details></section>`;
   if (R.porReg.length && podeEscrever()) html += `<section><div class="sec-h"><h2>Por registar</h2></div><div class="list">${R.porReg.map(p => `<div class="item"><div class="row"><span class="t">${esc(equipaNome(p.equipaId))}</span><span class="m">${dataCurta(p.data)}</span></div><button class="btn primary" data-act="registarPrev" data-id="${p.equipaId}" data-data="${p.data}" style="justify-self:start">Registar</button></div>`).join("")}</div></section>`;
+  if (R.acont.length) html += `<section><div class="sec-h"><h2>Acontecimentos</h2><span class="sub">${R.acont.length} no período</span></div><div class="list">${R.acont.map(e => `<div class="evento"><span class="t">📅 ${esc(e.titulo || "Evento")}</span><span class="m">${dataCurta(e.data)}${e.inicio ? " · " + esc(horaStd(e.inicio)) + (e.fim ? "–" + esc(horaStd(e.fim)) : "") : ""}${e.local ? " · " + esc(e.local) : ""}</span>${e.nota ? `<span class="m">${esc(e.nota)}</span>` : ""}</div>`).join("")}</div></section>`;
   if (eDono()) {
     const feitas = R.tarefas.filter(t => t.feito).length;
     html += `<section><div class="sec-h"><h2>Reuniões</h2><span class="sub">${R.reun.length} no período</span></div><div class="list">`;
@@ -815,6 +827,7 @@ function textoRelatorio() {
   if (podeEscrever() && R.dadas.length) { L.push("", "Quem deu:"); Object.entries(R.porPessoa).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
   if (Object.keys(R.temas).length) { L.push("", "Temas trabalhados (sessões realizadas):"); Object.entries(R.temas).sort((a, b) => b[1] - a[1]).forEach(([k, n]) => L.push(`• ${k}: ${n}`)); }
   if (Object.keys(R.aval).length) { L.push("", "Avaliações (média de cada teste):"); Object.entries(R.aval).forEach(([t, x]) => L.push(`• ${t}: ${(x.soma / x.n).toFixed(1)} de ${x.max} (${x.n} avaliações)`)); }
+  if (R.acont.length) { L.push("", "Acontecimentos:"); R.acont.forEach(e => L.push(`• ${dataCurta(e.data)}${e.inicio ? " " + horaStd(e.inicio) + (e.fim ? "–" + horaStd(e.fim) : "") : ""} · ${e.titulo}${e.local ? " (" + e.local + ")" : ""}`)); }
   if (podeGerir() && R.reun.length) {
     L.push("", `Reuniões: ${R.reun.length}` + (R.tarefas.length ? ` · tarefas concluídas ${R.tarefas.filter(t => t.feito).length} de ${R.tarefas.length}` : ""));
     R.reun.forEach(r => L.push(`• ${dataCurta(r.data)} (${r.tipo === "online" ? "online" : "presencial"})${r.objetivos ? ": " + r.objetivos.replace(/\s+/g, " ") : ""}`));
