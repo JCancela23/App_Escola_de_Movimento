@@ -87,6 +87,8 @@ button.item:hover { border-color: var(--muted) }
 .wk-h { font-size: 14px; color: var(--muted); padding: 2px 4px 4px; border-bottom: 1px solid var(--line) }
 .wk-h b { color: var(--fg); font-family: var(--display); letter-spacing: .04em }
 .wk-hoje { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase }
+.plimg { margin: 8px 0 2px } .plimg img { width: 100%; border-radius: 12px; border: 1px solid var(--line); display: block; background: #fff } .plimg figcaption { font-size: 13px; color: var(--muted, #5b6b62); margin-top: 5px }
+.imgrow { display: flex; gap: 8px; align-items: center } .imgrow img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: #fff; flex: none }
 .evento { display: grid; gap: 2px; border: 1px solid color-mix(in srgb, var(--accent2, #F2B632) 60%, var(--line)); border-left: 5px solid #F2B632; background: color-mix(in srgb, #F2B632 14%, var(--bg)); border-radius: 10px; padding: 9px 11px; color: var(--fg); text-align: left; width: 100%; font: inherit }
 .evento .t { font-weight: 700 }
 .evento .tag { justify-self: start; font-size: 12px; font-weight: 700; background: #F2B632; color: #1D2B24; border-radius: 99px; padding: 1px 8px }
@@ -1183,6 +1185,35 @@ const GRUPOS = ["A", "B", "C", "D", "E", "F"];
 const ORGS = [["", "Não indicado"], ["individual", "Individual"], ["pares", "Em pares"], ["trios", "Em trios"], ["grupos", "Grupos de…"]];
 const orgTxt = o => !o?.tipo ? "" : o.tipo === "grupos" ? `Grupos de ${o.n || "?"} atletas` : ORGS.find(x => x[0] === o.tipo)?.[1] || "";
 const trocaTxt = (t, gs) => [t?.valor ? `🔄 Trocam de grupo ao fim de ${t.valor} min` : "", t?.vezes ? `todos passam ${t.vezes} ${t.vezes == 1 ? "vez" : "vezes"} por cada grupo (${gs.join(" → ")})` : ""].filter(Boolean).join(" · ");
+// Imagens dos planos: pl.imagens = [{url, legenda, onde: "aquecimento" | "principal" | "simult"}], mostradas junto do bloco a que pertencem
+const imgsDe = (pl, onde) => (pl.imagens || []).filter(m => m.url && (m.onde || "principal") === onde);
+const htmlImgs = l => l.map(m => `<figure class="plimg"><a href="${esc(m.url)}" target="_blank" rel="noopener"><img src="${esc(m.url)}" alt="${esc(m.legenda || "Imagem do plano")}" loading="lazy"></a><figcaption>🔍 Toque para ampliar${m.legenda ? " · " + esc(m.legenda) : ""}</figcaption></figure>`).join("");
+async function reduzirImagem(file, max = 1600) {
+  const img = await createImageBitmap(file), k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+}
+async function carregarImagem(file) {
+  const blob = await reduzirImagem(file);
+  if (demo) return new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  const path = `img/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+  const { error } = await sb.storage.from("planos").upload(path, blob, { contentType: "image/jpeg" });
+  if (error) { toast("Não foi possível carregar a imagem: " + erroPT(error)); throw error; }
+  return sb.storage.from("planos").getPublicUrl(path).data.publicUrl;
+}
+const linhaImg = (m, principal) => `<div class="imgrow" data-img data-url="${esc(m.url)}"><img src="${esc(m.url)}" alt=""><div style="display:grid;gap:6px;flex:1"><input type="text" class="imLeg" value="${esc(m.legenda || "")}" placeholder="Legenda (ex.: esquema do circuito)" aria-label="Legenda da imagem">${principal ? `<label class="junto" style="font-size:14px"><input type="checkbox" class="imSim" ${m.onde === "simult" ? "checked" : ""}> Dentro da caixa "Em simultâneo"</label>` : ""}<button class="btn danger" type="button" data-rmimg>Retirar</button></div></div>`;
+const editorImgs = (pl, k) => `<div class="field imgbox" data-onde="${k}" style="border:1px dashed var(--line);border-radius:12px;padding:10px;margin-top:6px"><span class="lbl">Imagem deste bloco</span><div class="list imgs">${(pl.imagens || []).filter(m => m.url && (k === "principal" ? ["principal", "simult"].includes(m.onde || "principal") : m.onde === k)).map(m => linhaImg(m, k === "principal")).join("")}</div>
+  <label class="btn" style="text-align:center;cursor:pointer">📷 Adicionar imagem a este bloco<input type="file" accept="image/*" class="imFile" hidden></label><span class="m">Foto ou ficheiro. A app reduz a imagem antes de a enviar.</span></div>`;
+const lerImgs = el => [...el.querySelectorAll(".imgbox")].flatMap(b => [...b.querySelectorAll("[data-img]")].map(r => ({ url: r.dataset.url, legenda: r.querySelector(".imLeg").value.trim(), onde: b.dataset.onde === "principal" && r.querySelector(".imSim")?.checked ? "simult" : b.dataset.onde })));
+function ligarImgs(el) {
+  el.addEventListener("click", ev => { const b = ev.target.closest("[data-rmimg]"); if (b) b.closest("[data-img]").remove(); });
+  el.querySelectorAll(".imFile").forEach(inp => inp.addEventListener("change", async () => {
+    const f = inp.files[0]; if (!f) return; const box = inp.closest(".imgbox"); toast("A carregar a imagem…");
+    try { const url = await carregarImagem(f); box.querySelector(".imgs").insertAdjacentHTML("beforeend", linhaImg({ url, onde: box.dataset.onde }, box.dataset.onde === "principal")); toast("Imagem carregada. Não se esqueça de guardar o plano."); } catch (e) {}
+    inp.value = "";
+  }));
+}
 function htmlPlano(pl) {
   const itens = (pl.itens || []).filter(i => S.exercicios[i.exercicioId]);
   let n = 0;
@@ -1190,9 +1221,9 @@ function htmlPlano(pl) {
   // exercícios com grupo de trabalho: caixa "Em simultâneo" no sítio do 1.º, com uma coluna por grupo
   const parteHtml = l => { const comG = l.filter(i => i.grupo); if (!comG.length) return blocosHtml(l);
     const gs = GRUPOS.filter(g => comG.some(i => i.grupo === g)), p = l.indexOf(comG[0]);
-    const caixa = `<div class="simult"><span class="lblb">⇆ Em simultâneo · ${gs.length} grupos de trabalho</span><div class="grupos">${gs.map(g => `<div class="grupo"><span class="gt">Grupo ${g}</span>${blocosHtml(comG.filter(i => i.grupo === g))}</div>`).join("")}</div>${trocaTxt(pl.troca, gs) ? `<span class="trocab">${trocaTxt(pl.troca, gs)}</span>` : ""}</div>`;
+    const caixa = `<div class="simult"><span class="lblb">⇆ Em simultâneo · ${gs.length} grupos de trabalho</span><div class="grupos">${gs.map(g => `<div class="grupo"><span class="gt">Grupo ${g}</span>${blocosHtml(comG.filter(i => i.grupo === g))}</div>`).join("")}</div>${htmlImgs(imgsDe(pl, "simult"))}${trocaTxt(pl.troca, gs) ? `<span class="trocab">${trocaTxt(pl.troca, gs)}</span>` : ""}</div>`;
     const antes = blocosHtml(l.slice(0, p).filter(i => !i.grupo)); return antes + caixa + blocosHtml(l.slice(p).filter(i => !i.grupo)); };
-  const bloco = (k, nome) => { n = 0; const l = itens.filter(i => parteDe(i) === k); return `<div class="field"><span class="lbl">${nome}</span><div class="list">${parteHtml(l) || `<div class="empty">Sem exercícios.</div>`}</div></div>`; };
+  const bloco = (k, nome) => { n = 0; const l = itens.filter(i => parteDe(i) === k); const im = imgsDe(pl, k).concat(k === "principal" && !l.some(i => i.grupo) ? imgsDe(pl, "simult") : []); return `<div class="field"><span class="lbl">${nome}</span><div class="list">${parteHtml(l) || `<div class="empty">Sem exercícios.</div>`}${htmlImgs(im)}</div></div>`; };
   const cartaoItem = (i, n) => { const x = S.exercicios[i.exercicioId]; return `<div class="item">
       <div class="row"><span class="t">${n}. ${esc(x.nome)}</span>${i.dose ? `<span class="chip" style="color:var(--accent)">${esc(i.dose)}</span>` : ""}</div>
       ${x.descricao ? `<span class="m">${esc(x.descricao)}</span>` : ""}
@@ -1308,7 +1339,7 @@ function formPlano(id, op = {}) {
   const el = abrirFolha(`<h2>${id ? "Editar plano" : "Novo plano"}</h2>
     <div class="field"><label for="plNome">Nome</label><input type="text" id="plNome" value="${esc(pl.nome)}" placeholder="Ex.: Gatinhar · semana 1">${op.legenda ? `<span class="m">${esc(op.legenda)}</span>` : ""}${op.semana ? `<span class="m">Fica como plano da semana de ${dataCurta(op.semana).slice(4)}.</span>` : ""}</div>
     <div class="field"><span class="lbl">Tema(s)</span><div class="seg" id="plTema">${segTemas(temas)}</div></div>
-    ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button></div>`).join("")}
+    ${PARTES.map(([k, n]) => `<div class="field"><span class="lbl">${n}</span><div class="list" id="pl_${k}">${(pl.itens || []).filter(i => parteDe(i) === k).map(linhaI).join("")}</div><button class="btn" data-addparte="${k}">Adicionar exercício ao ${k === "aquecimento" ? "aquecimento" : "principal"}</button>${editorImgs(pl, k)}</div>`).join("")}
     ${exs.length ? "" : `<span class="m">Ainda não há exercícios na base de dados. Adicione-os em Exercícios.</span>`}
     <div class="field"><label for="plOrg">Organização dos atletas</label><div class="row" style="gap:8px"><select id="plOrg" style="flex:1">${ORGS.map(([v, t]) => `<option value="${v}" ${(pl.organizacao?.tipo || "") === v ? "selected" : ""}>${t}</option>`).join("")}</select><input type="number" id="plOrgN" min="2" max="30" inputmode="numeric" placeholder="nº" aria-label="Atletas por grupo" value="${esc(pl.organizacao?.n || "")}" style="width:80px" ${pl.organizacao?.tipo === "grupos" ? "" : "hidden"}></div></div>
     <div class="field" id="plTrocaF"><span class="lbl">Troca entre grupos de trabalho</span><span class="m">Para trabalho em simultâneo, escolha o grupo (A, B, C…) em cada exercício da parte principal.</span><div class="row" style="gap:8px;justify-content:flex-start"><span>Os grupos trocam ao fim de</span><input type="number" id="plTroca" min="1" max="60" inputmode="numeric" value="${esc(pl.troca?.valor || "")}" style="width:70px" aria-label="Trocam ao fim de (min)"><span>min</span></div>
@@ -1321,14 +1352,14 @@ function formPlano(id, op = {}) {
   el.querySelectorAll("[data-addparte]").forEach(b => b.addEventListener("click", () => $("#pl_" + b.dataset.addparte, el).insertAdjacentHTML("beforeend", linhaI({ parte: b.dataset.addparte }))));
   $("#plAddM", el)?.addEventListener("click", () => $("#plMat", el).insertAdjacentHTML("beforeend", linhaM({})));
   el.addEventListener("click", ev => { const b = ev.target.closest("[data-rm]"); if (b) b.closest("[data-item],[data-mat]").remove(); });
-  ligarBlocos(el);
+  ligarBlocos(el); ligarImgs(el);
   $("#plOk", el).addEventListener("click", async () => {
     const nome = $("#plNome", el).value.trim(); if (!nome) return toast("Dê um nome ao plano");
     const org = $("#plOrg", el).value, troca = +$("#plTroca", el).value || 0, trocaV = +$("#plTrocaV", el).value || 0;
     const dados = { nome, tema: temas[0], temas: temas.slice(), notas: $("#plNotas", el).value.trim(),
       organizacao: org ? { tipo: org, ...(org === "grupos" ? { n: +$("#plOrgN", el).value || null } : {}) } : null,
       troca: troca || trocaV ? { valor: troca || null, vezes: trocaV || null } : null,
-      itens: lerItens(el),
+      itens: lerItens(el), imagens: lerImgs(el),
       material: [...el.querySelectorAll("[data-mat]")].map(r => ({ materialId: r.querySelector(".mId").value, qtd: r.querySelector(".mQtd").value.trim() })).filter(m => m.materialId) };
     const pid = id || novoId("pl");
     try {
